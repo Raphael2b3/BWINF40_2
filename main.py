@@ -19,6 +19,10 @@ def liste_in_listevonliste(liste, listevonliste):
     return False
 
 
+def abbruchbedingung(position, differenz_abs, differnz_record):
+    return True
+
+
 class Ergebnis:
 
     def __init__(self, weg, unschärfe, neueWege, zieldistanz):
@@ -73,8 +77,8 @@ class Weg:
         ziel = self.weg[0].anderer_knoten(currentpos)
         if ziel is None:
             for i in self.weg:
-                pass #print(i)
-            #input("Stop")
+                pass  # print(i)
+            # input("Stop")
         return t + ")"
 
     def ziel(self):  # TODO das geht effizienter
@@ -266,38 +270,37 @@ class Graph:
     """  # path finding 1.0
 
     def blubkopf(self, start_knoten_id, weg, out, difrecord, gegangene_wege, zieldistanz, verwendete,
-                 positivcount=0, precord=0):
+                 gewonnene_strecke=0):
         start_knoten = self.knoten_by_id(start_knoten_id)  # instanziere StartKnoten ID
 
-        temp_dif = weg.gewicht - zieldistanz
+        abweichung_zieldastanz = gewonnene_strecke - zieldistanz if (gewonnene_strecke - zieldistanz) >= 0 else abs(
+            gewonnene_strecke - zieldistanz) + 0.1
+        # TODO  Das Problem:  Ich habe eine durchschnittsmenge an neuen straßen die ich protag überqueren muss. Jenäher
+        #  ich an diese Menge rankomme umso wahrscheinlicher ist es dass ich nach 5 tagen bei jedem
+        #  dieser suchen alle straßen durchgenommen habe.
+        #  Das Funktioniert aber nicht immer. Ich vernachlässige so, Wege die viel nützen und wenige wege Doppelt nehmen.
 
-        if start_knoten_id == 0 and (0 <= temp_dif <= difrecord) and positivcount >= precord:
+        if start_knoten_id == 0 and abweichung_zieldastanz < difrecord and (
+                weg.gewicht < out.gewicht or out.gewicht == 0):
             if not liste_in_listevonliste(weg.weg, gegangene_wege):
-                """print("###### ERGEBNIS #####")
-                print("Wir entscheiden uns für den Weg")
-                print(weg)
-                print("Weil", "0 <=", temp_dif, "(temp_dif) <=", difrecord, "(difrecord) und", positivcount,
-                      "(Punkte)>=", precord, "(Recordpunkte)")
-                """#input()
                 out = weg.copy()
-                difrecord = temp_dif
-                precord = positivcount
+                difrecord = abweichung_zieldastanz
                 # zieldistanz = weg.gewicht
         else:
             """print("Aktueller Knoten:", start_knoten)
             print("Seine kanten: ")
             for k in start_knoten.depriorize(verwendete):
                 print(k)
-"""
-            for kante in start_knoten.kanten:  # zuerst die nichverwendeten Kanten
+    """
+            for kante in start_knoten.depriorize(verwendete):  # zuerst die nichverwendeten Kanten
                 # und dann die bereits verwendeten
-
+                add = kante.gewicht if kante not in verwendete else 0
                 ziel_knoten_id = kante.anderer_knoten(start_knoten)
-                zukunfts_differenz = (weg.gewicht + kante.gewicht - zieldistanz)
-                if zukunfts_differenz <= difrecord:
-                    add = 1 if kante not in verwendete else 0
-                    #print(add)
-                    positivcount += add
+                zukunfts_differenz = abs(weg.gewicht + add - zieldistanz)
+                if zukunfts_differenz <= difrecord and (weg.gewicht <= out.gewicht or out.gewicht == 0):
+
+                    # print(add)
+                    gewonnene_strecke += add
                     weg.append(kante)
                     tmp = False
                     if kante not in verwendete:
@@ -307,15 +310,16 @@ class Graph:
                     """print("Wir probieren", kante, "Wir hätten also", positivcount, "Punkte (Record:", precord, ")")
                     print("Ziel", zieldistanz, " Zurückgelegtestrecke", weg.gewicht)
                     #input()
-"""
-                    out, difrecord, precord, zieldistanz = self.blubkopf(ziel_knoten_id, weg, out, difrecord,
-                                                                         gegangene_wege,
-                                                                         zieldistanz, verwendete, positivcount, precord)
+            """
+                    out, difrecord, gewonnene_strecke, zieldistanz = self.blubkopf(ziel_knoten_id, weg, out, difrecord,
+                                                                                   gegangene_wege,
+                                                                                   zieldistanz, verwendete,
+                                                                                   gewonnene_strecke)
                     if tmp: verwendete.remove(kante)
                     weg.remove(kante)
-                    positivcount -= add
+                    gewonnene_strecke -= add
 
-        return out, difrecord, precord, zieldistanz
+        return out, difrecord, gewonnene_strecke, zieldistanz
 
     def knoten_by_id(self, id) -> Knoten:
         for o in self.knoten:
@@ -351,12 +355,18 @@ class Graph:
                 break
 
             print(besuchtekanten)
-            weg, dif, goodnews, tmp_zieldistanz = self.blubkopf(centrale, Weg(0), Weg(0), weitestershit, besuchtewege,
-                                                            zieldistanz,
-                                                            besuchtekanten)
+            weg, dif, goodnews, tmp_zieldistanz = self.blubkopf(centrale.id, Weg(0), Weg(0), zieldistanz, besuchtewege,
+                                                                zieldistanz,
+                                                                besuchtekanten)
+            print("Tag ", tag + 1)
+            print(weg)
+            input()
             e = Ergebnis(weg, dif, goodnews, tmp_zieldistanz)
             for w in weg.weg:
-                besuchtekanten.append(w)
+                if w not in besuchtekanten:
+                    besuchtekanten.append(w)
+                else:
+                    print("ayyy")
                 if w in verfügbarekanten:
                     verfügbarekanten.remove(w)
             besuchtewege.append(weg)
@@ -404,7 +414,7 @@ class Graph:
 
 def get_input():
     global bigINT
-    pfad = "muellabfuhr1.txt"
+    pfad = "muellabfuhr0.txt"
 
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
