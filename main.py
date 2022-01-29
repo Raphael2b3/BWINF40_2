@@ -10,9 +10,9 @@ turtle.tracer(0)
 def liste_in_listevonliste(liste, listevonliste):
     tmp = True
     for i in listevonliste:
-        if len(i.weg) == len(liste):
-            for j in range(len(i.weg)):
-                if i.weg[j] != liste[j]:
+        if len(i.weg.weg) == len(liste):
+            for j in range(len(i.weg.weg)):
+                if i.weg.weg[j] != liste[j]:
                     tmp = False
             if tmp:
                 return True
@@ -25,17 +25,35 @@ def abbruchbedingung(position, differenz_abs, differnz_record):
 
 class Ergebnis:
 
-    def __init__(self, weg, unschärfe, neueWege, zieldistanz):
+    def __init__(self, weg=None, unschärfe=None, neueWege=None, durchschnitt_ziel=None):
         self.weg = weg
         self.unschärfe = unschärfe
         self.neueWege = neueWege
-        self.zieldistanz = zieldistanz
-        self.distanz = weg.gewicht
+        self.durchschnitt_ziel = durchschnitt_ziel
+        self.distanz = weg.gewicht if weg is not None else None
 
     def __str__(self):
         t = self.weg.__str__()
-        t += f"\nUnschärfe {self.unschärfe}, neue Wege{self.neueWege}, Zieldistanz {self.zieldistanz}, distanz {self.distanz}"
+        t += f"\nUnschärfe vom erwarteten Durchschnitt {self.unschärfe} (Tages Durchschnitt/{self.durchschnitt_ziel})\ngewonnene Wege{self.neueWege}, distanz {self.distanz}"
         return t
+
+    def besserAls(self, other):
+        # diese instanz ist besser als die other instanz wenn
+        if other.weg is None:
+            return True
+        if self.distanz == other.distanz and self.neueWege > other.neueWege:  # wenn bei gleicher allgemeiner distanz mehr neue wege gegangen wurden
+            return True
+        if self.distanz < other.distanz and self.neueWege == other.neueWege:  # wenn bei gleicher strecke neuer wege weniger distanz gegangen wurde
+            return True
+        if self.distanz < other.distanz and self.neueWege > other.neueWege:  # weniger distanz aber mehr neue wege gegangen wurde
+            return True
+        """if self.distanz < other and self.neueWege < other.neueWege and (self.neueWege - self.durchschnitt_ziel) >= 0:
+            # weniger weg gegangen wurde und man auch weniger neue wege hat aber man mehr als der erwartete durchschnitt hat
+            return True
+        if self.distanz < other and (self.neueWege - self.durchschnitt_ziel) >= 0:
+            return True
+"""
+        return False
 
 
 class Weg:
@@ -53,6 +71,10 @@ class Weg:
     def remove(self, object):
         self.weg.remove(object)
         self.gewicht -= object.gewicht
+
+    def pop(self, i):
+        self.gewicht -= self.weg[i].gewicht
+        self.weg.pop(i)
 
     def copy(self):
         t = Weg(self.start)
@@ -74,11 +96,11 @@ class Weg:
             ziel = w.anderer_knoten(currentpos)
             t += f"Start: K{currentpos} -> K{ziel}({w.gewicht})\n"
             currentpos = ziel
+            if currentpos is None:
+                print("Errorcode: 69")
+
         ziel = self.weg[0].anderer_knoten(currentpos)
-        if ziel is None:
-            for i in self.weg:
-                pass  # print(i)
-            # input("Stop")
+
         return t + ")"
 
     def ziel(self):  # TODO das geht effizienter
@@ -122,14 +144,20 @@ class Knoten:
         self.id = id
 
     def depriorize(self, list):
+
+        # l.reverse()
         t = []
         # good ones
+
         for i in self.kanten:
             if i not in list:
                 t.append(i)
         # bad ones
-        for i in self.kanten:
-            if i in list:
+        # die jüngste Kante wird mehr prioriesiert weil durch das kreislaufsprinzip die kante die erneut gewählt werden
+        # soll eine Sein soll die gerade genommen wurde da die start kante zurück liegt und die ziel kante grade erst
+        # gefunden so wird der selbe weg verhindert
+        for i in list:
+            if i in self.kanten:
                 t.append(i)
         return t
 
@@ -169,9 +197,9 @@ class Graph:
 
         return 1
 
-    def min_strecke_pro_tag(self):
+    def min_strecke_pro_tag(self, kanten):
         mini = 0
-        for k in self.kanten:
+        for k in kanten:
             mini += k.gewicht
         mini /= verfügbareTage
         return mini
@@ -237,68 +265,64 @@ class Graph:
                     for i in start_knoten.kanten:
                         if i.anderer_knoten(start_knoten) != ziel_knoten_id:
                             geblockte_knoten.remove(i.anderer_knoten(start_knoten))
-                    weg.remove(kante)
+                    weg.pop(-1)
             geblockte_knoten.remove(start_knoten_id)
         return kürzesterweg
 
     """
         def blub(self, start_knoten_id, weg, kürzesterweg, verwendete=None, zieldistanz=0, differenz=None):
             if verwendete is None: verwendete = []
-    
+
             start_knoten = self.knoten_by_id(start_knoten_id)  # instanziere StartKnoten ID
             temp_dif = weg.gewicht - zieldistanz
-    
+
             if start_knoten_id == 0 and 0 < temp_dif < differenz:
                 kürzesterweg = weg.copy()
                 differenz = temp_dif
             else:
                 for kante in start_knoten.depriorize(verwendete):  # zuerst die nichverwendeten Kanten
                     # und dann die bereits verwendeten
-    
+
                     ziel_knoten_id = kante.anderer_knoten(start_knoten)
                     zukunfts_gewicht = (weg.gewicht + kante.gewicht - zieldistanz)
                     if differenz is None or zukunfts_gewicht < differenz:
                         weg.append(kante)
                         verwendete.append(kante)
-    
+
                         kürzesterweg, differenz = self.blub(ziel_knoten_id, weg, kürzesterweg, verwendete, zieldistanz,
                                                             differenz)
                         verwendete.remove(kante)
                         weg.remove(kante)
-    
+
             return kürzesterweg, differenz
     """  # path finding 1.0
 
-    def blubkopf(self, start_knoten_id, weg, out, difrecord, gegangene_wege, zieldistanz, verwendete,
+    """def rekursiv_pathfinding_2(self, start_knoten_id, weg, out, difrecord, gegangene_wege, zieldistanz, verwendete,
                  gewonnene_strecke=0):
         start_knoten = self.knoten_by_id(start_knoten_id)  # instanziere StartKnoten ID
 
         abweichung_zieldastanz = gewonnene_strecke - zieldistanz if (gewonnene_strecke - zieldistanz) >= 0 else abs(
             gewonnene_strecke - zieldistanz) + 0.1
-        # TODO  Das Problem:  Ich habe eine durchschnittsmenge an neuen straßen die ich protag überqueren muss. Jenäher
-        #  ich an diese Menge rankomme umso wahrscheinlicher ist es dass ich nach 5 tagen bei jedem
-        #  dieser suchen alle straßen durchgenommen habe.
-        #  Das Funktioniert aber nicht immer. Ich vernachlässige so, Wege die viel nützen und wenige wege Doppelt nehmen.
 
-        if start_knoten_id == 0 and abweichung_zieldastanz < difrecord and (
-                weg.gewicht < out.gewicht or out.gewicht == 0):
+        if start_knoten_id == 0 and weg.gewicht > 0 and gewonnene_strecke > 0:
+
             if not liste_in_listevonliste(weg.weg, gegangene_wege):
-                out = weg.copy()
-                difrecord = abweichung_zieldastanz
-                # zieldistanz = weg.gewicht
+                tmp_out = Ergebnis(weg.copy(), abweichung_zieldastanz, gewonnene_strecke, zieldistanz)
+                if tmp_out.besserAls(out):
+                    out = tmp_out
+                    print(out)
         else:
-            """print("Aktueller Knoten:", start_knoten)
+            print("Aktueller Knoten:", start_knoten)
             print("Seine kanten: ")
             for k in start_knoten.depriorize(verwendete):
                 print(k)
-    """
+    
             for kante in start_knoten.depriorize(verwendete):  # zuerst die nichverwendeten Kanten
                 # und dann die bereits verwendeten
                 add = kante.gewicht if kante not in verwendete else 0
                 ziel_knoten_id = kante.anderer_knoten(start_knoten)
-                zukunfts_differenz = abs(weg.gewicht + add - zieldistanz)
-                if zukunfts_differenz <= difrecord and (weg.gewicht <= out.gewicht or out.gewicht == 0):
 
+                if out.distanz is None or weg.gewicht + kante.gewicht <= out.distanz:
                     # print(add)
                     gewonnene_strecke += add
                     weg.append(kante)
@@ -306,20 +330,20 @@ class Graph:
                     if kante not in verwendete:
                         tmp = True
                         verwendete.append(kante)
+                    else:
+                        verwendete.remove(kante)
+                        verwendete.append(kante)
 
-                    """print("Wir probieren", kante, "Wir hätten also", positivcount, "Punkte (Record:", precord, ")")
-                    print("Ziel", zieldistanz, " Zurückgelegtestrecke", weg.gewicht)
-                    #input()
-            """
-                    out, difrecord, gewonnene_strecke, zieldistanz = self.blubkopf(ziel_knoten_id, weg, out, difrecord,
-                                                                                   gegangene_wege,
-                                                                                   zieldistanz, verwendete,
-                                                                                   gewonnene_strecke)
+                    out, difrecord, gewonnene_strecke, zieldistanz = \
+                        self.rekursiv_pathfinding_2(ziel_knoten_id, weg, out, difrecord, gegangene_wege, zieldistanz,
+                                                    verwendete, gewonnene_strecke)
                     if tmp: verwendete.remove(kante)
-                    weg.remove(kante)
+                    weg.pop(-1)
                     gewonnene_strecke -= add
 
         return out, difrecord, gewonnene_strecke, zieldistanz
+"""  # path finding 2.0
+
 
     def knoten_by_id(self, id) -> Knoten:
         for o in self.knoten:
@@ -334,13 +358,39 @@ class Graph:
         return f"Graph:\n{knotenSTR}"
 
     def fahrplan(self):
-        zieldistanz = self.min_strecke_pro_tag()
+        zieldistanz = self.min_strecke_pro_tag(self.kanten) * 2
         fahrplan = []
         besuchtewege = []
         besuchtekanten = []
         verfügbarekanten = self.kanten[:]
         centrale = self.knoten_by_id(0)
-        weitestershit = int(self.weiteste_kante(centrale)[0].gewicht * 2) + 1
+
+        # TODO  1. Ermittle die weiteste (verfügbare) Kante.
+        #  2. berechne den kürzesten weg zur weitesten kante und zurück.
+        #  3. merke dir wie wieviel neue strecke man gewonnen hat. Wenn man weniger als den Durchschnitt an strecke gewonnen hat
+        #  dann wird die kürzeste strecke ermittelt um den Durchschnitt zu überschreiten
+        #  4. Ermittle einen neuen Ziel durchschnitt und mach das gleiche nochmal
+        #
+        #
+        weg, weitestekante = self.weiteste_kante(centrale, verfügbarekanten)
+
+        for w in weg.weg:
+            if w not in besuchtekanten:
+                besuchtekanten.append(w)
+            if w in verfügbarekanten:
+                verfügbarekanten.remove(w)
+
+        position = weg.ziel()
+        heimweg = self.kürzester_weg(position, centrale, Weg(position), [], Weg(position), besuchtekanten)
+
+        for w in weg.weg:
+            if w not in besuchtekanten:
+                besuchtekanten.append(w)
+            if w in verfügbarekanten:
+                verfügbarekanten.remove(w)
+        weg.gewicht + heimweg.gewicht
+        fahrplan.append(weg + heimweg)
+        print(weg + heimweg)  # endregion
 
         ######################################
         for tag in range(14):
@@ -348,47 +398,31 @@ class Graph:
                 print("BIG PROBLEM")
                 break
             if len(verfügbarekanten) == 0:
-                print("Finished")
-                for i in range(len(fahrplan)):
-                    print("Tag", i + 1)
-                    print(fahrplan[i])
                 break
+            # region nice try
 
-            print(besuchtekanten)
-            weg, dif, goodnews, tmp_zieldistanz = self.blubkopf(centrale.id, Weg(0), Weg(0), zieldistanz, besuchtewege,
-                                                                zieldistanz,
-                                                                besuchtekanten)
-            print("Tag ", tag + 1)
-            print(weg)
-            input()
-            e = Ergebnis(weg, dif, goodnews, tmp_zieldistanz)
-            for w in weg.weg:
-                if w not in besuchtekanten:
-                    besuchtekanten.append(w)
-                else:
-                    print("ayyy")
-                if w in verfügbarekanten:
-                    verfügbarekanten.remove(w)
-            besuchtewege.append(weg)
-            fahrplan.append(e)
-            """weg, weitestekante = self.weiteste_kante(centrale, verfügbarekanten)
-            for w in weg.weg:
-                besuchtekanten.append(w)
-                if w in verfügbarekanten:
-                    verfügbarekanten.remove(w)
-            position = weg.ziel()
-            heimweg = self.kürzester_weg(position, centrale, Weg(position), [], Weg(position), besuchtekanten)
-            for w in heimweg.weg:
-                besuchtekanten.append(w)
-                if w in verfügbarekanten:
-                    verfügbarekanten.remove(w)
-            fahrplan.append(weg + heimweg)
-            print(weg + heimweg)"""  # nice try
+
+        print("Finished")
         for i in range(len(fahrplan)):
             print("Tag", i + 1)
             print(fahrplan[i])
-        print(zieldistanz)
 
+        """print("Anzahlbesuchterkanten", len(besuchtekanten), "Ziel", len(self.kanten))
+                        zieldistanz = self.min_strecke_pro_tag(verfügbarekanten) * 2
+                        ergebniss, dif, goodnews, tmp_zieldistanz = self.rekursiv_pathfinding_2(centrale.id, Weg(0), Ergebnis(),
+                                                                                                zieldistanz, besuchtewege,
+                                                                                                zieldistanz, besuchtekanten)
+                        print("############### I found:", ergebniss)
+                        for w in ergebniss.weg.weg:
+                            if w not in besuchtekanten:
+                                besuchtekanten.append(w)
+                            else:
+                                print("ayyy")
+                            if w in verfügbarekanten:
+                                verfügbarekanten.remove(w)
+                        besuchtewege.append(ergebniss)
+                        fahrplan.append(ergebniss)
+            """  # better try
         return fahrplan
 
     def draw_situation(self):
@@ -414,7 +448,7 @@ class Graph:
 
 def get_input():
     global bigINT
-    pfad = "muellabfuhr0.txt"
+    pfad = "muellabfuhr4.txt"
 
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
