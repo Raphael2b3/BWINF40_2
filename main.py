@@ -1,5 +1,6 @@
-import time
 import turtle
+
+import performance_analysing
 
 bigINT = 0
 verfügbareTage = 5  # von montag bis freitag sind 5 tage
@@ -21,6 +22,58 @@ def liste_in_listevonliste(liste, listevonliste):
 
 def abbruchbedingung(position, differenz_abs, differnz_record):
     return True
+
+
+class GenerationenBaumIterator:
+    def __init__(self, baum):
+        self.baum = baum
+        self.index = 0
+
+    def __next__(self):
+        return True
+
+
+class GenerationenBaum:
+
+    def __init__(self, ursprungsknoten):
+        self.knoten = ursprungsknoten
+        self.generationen = {0: [ursprungsknoten]}
+        self.letztegeneration = 0
+
+    def add(self, key, value):
+        if key not in self.generationen:
+            self.generationen[key] = [value]
+            self.letztegeneration = key
+        else:
+            if value not in self:
+                self.generationen[key].append(value)
+
+    def find_generation_of_item(self, value):
+        for i in self.generationen:
+            if value in self.generationen[i]:
+                return i
+
+    def __contains__(self, item):
+        for i in self.generationen:
+            if item in self.generationen[i]:
+                return True
+        return False
+
+    def __str__(self):
+        t = "Generationen Baum:\n"
+        for i in self.generationen:
+            t += f" - Gen{i}:{self.generationen[i]}\n"
+        return t
+
+    def __iter__(self):
+        return GenerationenBaumIterator(self)
+
+    def toList(self):
+        out = []
+        for i in self.generationen:
+            for j in self.generationen[i]:
+                out.append(j)
+        return out
 
 
 class Ergebnis:
@@ -178,6 +231,11 @@ class Knoten:
         turtle.circle(20)
         turtle.write(self.id)
 
+    def get_kanten_außer(self, exceptions):  # returnt die Liste der kanten mit außnahme der übergebenen kante
+        out = self.kanten[:]
+        out.remove(exceptions)
+        return out
+
 
 class Graph:
 
@@ -193,11 +251,12 @@ class Graph:
         print("Strecken die es zu befahren gilt", strecken)
         print("pro tag müssen", min_t, "strecken abgefahren werden")"""  # Test 1
 
-        t = self.fahrplan()
+        self.blubuniuskopf()
+        # t = self.fahrplan()
 
         return 1
 
-    def min_strecke_pro_tag(self, kanten):
+    def min_strecke_pro_tag(self, kanten, verfügbareTage):
         mini = 0
         for k in kanten:
             mini += k.gewicht
@@ -212,8 +271,9 @@ class Graph:
         tk = None
         for kant in kanten:
             kwA = self.kürzester_weg(knoten.id, kant.start, Weg(knoten.id), [], Weg(knoten.id))
+            print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             kwB = self.kürzester_weg(knoten.id, kant.stop, Weg(knoten.id), [], Weg(knoten.id))
-
+            print("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
             if kant in kwA.weg:
                 tweg = kwA
             elif kant in kwB.weg:
@@ -242,7 +302,12 @@ class Graph:
                     weg = kürzesterweg
         return weg
 
-    def kürzester_weg(self, start_knoten_id, end_knoten_id, weg, geblockte_knoten, kürzesterweg,
+    def kürzester_weg(self):
+
+        pass
+
+    """
+        def kürzester_weg(self, start_knoten_id, end_knoten_id, weg, geblockte_knoten, kürzesterweg,
                       verwendete=None):
         if verwendete is None: verwendete = []
         start_knoten = self.knoten_by_id(start_knoten_id)  # instanziere StartKnoten ID
@@ -268,6 +333,78 @@ class Graph:
                     weg.pop(-1)
             geblockte_knoten.remove(start_knoten_id)
         return kürzesterweg
+    """  # kürzersterweg 1.0
+
+    def finde_weg(self, start_id, stop_id):
+        genBaumStart = GenerationenBaum(start_id)
+        genBaumStop = GenerationenBaum(stop_id)
+        wertepaare = self.finde_wege_rek(genBaumStart, genBaumStop)
+        for paar in wertepaare:
+            grenzeA, grenzeB = paar
+            # TODO Finde den weg, mit der information wieviele rekursive_schritte nötig sein können um einen weg zu
+            # generieren/ Paare.
+
+    def finde_weg_mit_grenzen(self, grenzeA, grenzeB, statusA, statusB, wegA, wegB):
+
+        pass
+
+    def finde_wege_rek(self, genBaumStart: GenerationenBaum, genBaumStop: GenerationenBaum, wertepaare, generation=0):
+        # TODO Idee: die Bäume sollen soweit ausgebreitet werden können wie es nur geht.
+        #  Es dürfen in den beiden Bäumen aber keine Äste an denjenigen Knoten entstehen, die in dem anderen Baum
+        #  bereits erreichtwurden. Wer zu erst malt, malt zuerst. Sollte ein Knoten zur ecxact gleichen Generation
+        #  erreicht werden, so darf keiner der Beiden Böume daraus die Äste weiter bauen. Vielspaß und Check mal aus ob
+        #  die Telekom dich schon angenommen hat ;) <3
+
+        genBaumStart = self.generiere_generation(generation, genBaumStart, genBaumStart.letztegeneration)
+        genBaumStop = self.generiere_generation(generation, genBaumStop, genBaumStop.letztegeneration)
+
+        treffpunkt = self.hat_schnittmenge(genBaumStart, genBaumStop)
+        if treffpunkt is not None:
+            genStart = genBaumStart.find_generation_of_item(treffpunkt)
+            genStop = genBaumStop.find_generation_of_item(treffpunkt)
+            return genStart, genStop
+
+        else:
+            return self.finde_wege_rek(genBaumStart, genBaumStop, generation + 1)
+
+    def hat_schnittmenge(self, a: GenerationenBaum, b: GenerationenBaum):
+
+        for i in a.toList():
+            for j in b.toList():
+                if i == j:
+                    return i
+
+    def generiere_generation(self, zielgeneration, generationsBaum: GenerationenBaum, generation=0) -> GenerationenBaum:
+
+        if zielgeneration == generation:
+            return generationsBaum
+        else:
+            for knoten_id in generationsBaum.generationen[generation]:
+                knoten = self.knoten_by_id(knoten_id)
+                geerbtekanten = []
+                for kante in knoten.kanten:
+                    ziel = kante.anderer_knoten(knoten_id)
+                    if ziel not in generationsBaum:
+                        generationsBaum.add(generation + 1, ziel)
+                        geerbtekanten.append(kante)
+
+                self.generiere_generation(zielgeneration, generationsBaum, generation + 1)
+
+        return generationsBaum
+
+    def blubuniuskopf(self):
+
+        perf.set_time_point(f"Suche Kanten....")
+        i = 0
+        j = len(self.kanten)
+        for k in self.kanten:
+            self.finde_weg(0, k.start)
+            self.finde_weg(0, k.stop)
+            print(f"{i}/{j} :: {i / j}%")
+            i += 1
+
+        perf.set_time_point(f"Kantengefunden")
+        input("Hab das einfach jetzt fertig YASELEME")
 
     """
         def blub(self, start_knoten_id, weg, kürzesterweg, verwendete=None, zieldistanz=0, differenz=None):
@@ -344,7 +481,6 @@ class Graph:
         return out, difrecord, gewonnene_strecke, zieldistanz
 """  # path finding 2.0
 
-
     def knoten_by_id(self, id) -> Knoten:
         for o in self.knoten:
             if o.id == id:
@@ -358,49 +494,105 @@ class Graph:
         return f"Graph:\n{knotenSTR}"
 
     def fahrplan(self):
-        zieldistanz = self.min_strecke_pro_tag(self.kanten) * 2
+
         fahrplan = []
         besuchtewege = []
         besuchtekanten = []
         verfügbarekanten = self.kanten[:]
         centrale = self.knoten_by_id(0)
+        gewonnene_strecke = 0
 
-        # TODO  1. Ermittle die weiteste (verfügbare) Kante.
+        """# TODO  1. Ermittle die weiteste (verfügbare) Kante.
         #  2. berechne den kürzesten weg zur weitesten kante und zurück.
         #  3. merke dir wie wieviel neue strecke man gewonnen hat. Wenn man weniger als den Durchschnitt an strecke gewonnen hat
         #  dann wird die kürzeste strecke ermittelt um den Durchschnitt zu überschreiten
         #  4. Ermittle einen neuen Ziel durchschnitt und mach das gleiche nochmal
-        #
-        #
+        zieldistanz = self.min_strecke_pro_tag(verfügbarekanten)
+        perf.set_time_point("Ermittle weiteste Kante")
         weg, weitestekante = self.weiteste_kante(centrale, verfügbarekanten)
 
         for w in weg.weg:
             if w not in besuchtekanten:
                 besuchtekanten.append(w)
+                gewonnene_strecke += w.gewicht
             if w in verfügbarekanten:
                 verfügbarekanten.remove(w)
-
+        perf.set_time_point("Ermittle Rückweg")
         position = weg.ziel()
         heimweg = self.kürzester_weg(position, centrale, Weg(position), [], Weg(position), besuchtekanten)
-
         for w in weg.weg:
             if w not in besuchtekanten:
                 besuchtekanten.append(w)
+                gewonnene_strecke += w.gewicht
             if w in verfügbarekanten:
                 verfügbarekanten.remove(w)
-        weg.gewicht + heimweg.gewicht
-        fahrplan.append(weg + heimweg)
-        print(weg + heimweg)  # endregion
 
-        ######################################
+        länge = weg.gewicht + heimweg.gewicht
+        if gewonnene_strecke < zieldistanz:
+            print("Problem")
+
+        fahrplan.append(weg + heimweg)
+
+        print(weg + heimweg)"""
+        print()
+        print()
+        print()
+        print()
         for tag in range(14):
-            if tag == 7:
+            gewonnene_strecke = 0
+            if tag == 5:
                 print("BIG PROBLEM")
                 break
+            print("Tag:", tag + 1)
             if len(verfügbarekanten) == 0:
                 break
-            # region nice try
+            print(f"\nInformations:")
+            print("Noch nicht besuchte Kanten:")
+            tmp = 0
+            for i in verfügbarekanten:
+                tmp += i.gewicht
+                print(i)
+            print("Noch zu gehender weg", tmp, " Tage übrig:", 5 - tag)
 
+            zieldistanz = self.min_strecke_pro_tag(verfügbarekanten, 5 - tag)
+            print("Zieldistanz:", zieldistanz, tmp / (5 - tag))
+
+            perf.set_time_point("Ermittle weiteste Kante")
+            weg, weitestekante = self.weiteste_kante(centrale, verfügbarekanten)
+            print(f"\nWeisteste Kante:", weitestekante)
+            print("Weg dahin:", weg)
+            for w in weg.weg:
+                if w not in besuchtekanten:
+                    besuchtekanten.append(w)
+                    gewonnene_strecke += w.gewicht
+                if w in verfügbarekanten:
+                    verfügbarekanten.remove(w)
+            print("Dadurch gewonnene Strecke:", gewonnene_strecke)
+            print()
+            perf.set_time_point("Ermittle Rückweg")
+            position = weg.ziel()
+
+            heimweg = self.kürzester_weg(position, centrale, Weg(position), [], Weg(position), besuchtekanten)
+            print()
+            print("Weg zurück:", heimweg)
+            tmp = gewonnene_strecke
+            for w in heimweg.weg:
+                if w not in besuchtekanten:
+                    besuchtekanten.append(w)
+                    gewonnene_strecke += w.gewicht
+                if w in verfügbarekanten:
+                    verfügbarekanten.remove(w)
+            print("Dadurch zusätzlich gewonnene Strecke:", gewonnene_strecke - tmp)
+
+            print("Gewonnene strecke:", gewonnene_strecke)
+
+            länge = weg.gewicht + heimweg.gewicht
+            print("Länge des Weges", länge)
+            print(gewonnene_strecke, "<", zieldistanz)
+            if gewonnene_strecke < zieldistanz:
+                print("Problem")
+
+            fahrplan.append(weg + heimweg)
 
         print("Finished")
         for i in range(len(fahrplan)):
@@ -423,6 +615,7 @@ class Graph:
                         besuchtewege.append(ergebniss)
                         fahrplan.append(ergebniss)
             """  # better try
+
         return fahrplan
 
     def draw_situation(self):
@@ -448,7 +641,7 @@ class Graph:
 
 def get_input():
     global bigINT
-    pfad = "muellabfuhr4.txt"
+    pfad = "muellabfuhr8.txt"
 
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
@@ -476,12 +669,16 @@ def get_input():
 
 
 if __name__ == '__main__':
-    start = time.time()
+    d = {
+        1: "1",
+        "Pimmelkopf": "1",
+        "1": "Pimmelkopf2"
+    }
+
+    perf = performance_analysing.time_analysing()
+    perf.set_time_point("Reading the Textfile")
     fahrplan = get_input()
+    perf.set_time_point("Read the Textfile, continuing with main function")
     fahrplan.main()
-    stop = time.time()
-
-    delta = stop - start
-    print("Time Required", delta)
-
+    perf.set_time_point("Finished the Programm")
     # t.mainloop()
