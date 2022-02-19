@@ -4,6 +4,8 @@ perf = performance_analysing.time_analysing()
 
 verfügbareTage = 5  # von montag bis freitag sind 5 tage
 
+#TODO PERFORMANCE VERBESSERN
+
 def print(*args):
     return
     _print(*args)
