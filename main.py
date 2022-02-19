@@ -1,9 +1,15 @@
 import performance_analysing
-
+from builtins import print as _print
 perf = performance_analysing.time_analysing()
 
 verfügbareTage = 5  # von montag bis freitag sind 5 tage
 
+def print(*args):
+    return
+    _print(*args)
+
+def log(*args):
+    _print(*args)
 
 def timer_start():
     perf.set_time_point("Start")
@@ -25,39 +31,45 @@ class SPD_knoten:
 
 class Shortest_path_database:
 
-    def __init__(self, start_id, _graph):
-        self.start = start_id
-        self.graph: Graph = _graph
-        self.knoten = []
-        for knoten in _graph.knoten:
-            self.knoten.append(SPD_knoten(knoten, start_id))
+    def __init__(self, _start_id, _graph, _geblockte_kanten: list = None):
+        if _geblockte_kanten is None:
+            self.geblockte_kanten = []
+        else:
+            self.geblockte_kanten = _geblockte_kanten
 
-        self.find(self.knoten[0])
+        self.start = _start_id
+        self.graph: Graph = _graph
+        self.knoten = {}
+        for _knoten in _graph.knoten:
+            knot = SPD_knoten(_knoten, _start_id)
+            self.knoten[knot.knoten.id] = knot
+
+        self.find(self.knoten[_start_id])
 
     def find(self, current_knoten):
         current_weg = current_knoten.weg  # referenz is the same, its like an rename
         current_knoten.finished = True
         current_knoten.distance = current_weg.gewicht
 
-        for kante in current_knoten.knoten.kanten:
-            ziel_id = kante.anderer_knoten(current_knoten.knoten.id)
+        for _kante in current_knoten.knoten.kanten:
+            if _kante in self.geblockte_kanten:
+                continue
+            ziel_id = _kante.anderer_knoten(current_knoten.knoten.id)
             ziel_knoten = self.knoten[ziel_id]
 
-            if not ziel_knoten.finished and current_knoten.distance + kante.gewicht < ziel_knoten.distance:
+            if not ziel_knoten.finished and current_knoten.distance + _kante.gewicht < ziel_knoten.distance:
                 ziel_knoten.weg = current_weg.copy()
-                ziel_knoten.weg.append(kante)
+                ziel_knoten.weg.append(_kante)
                 ziel_knoten.distance = ziel_knoten.weg.gewicht
 
-        # noinspection PyTypeChecker
         nähster_knoten: SPD_knoten = None
-        tmp = False
-        for knoten in self.knoten:
+        success = False
+        for knoten in self.knoten.values():
             if (nähster_knoten is None or knoten.distance < nähster_knoten.distance) and not knoten.finished:
                 nähster_knoten = knoten
-                if not knoten.finished:
-                    tmp = True
+                success = True
 
-        if tmp: self.find(nähster_knoten)
+        if success: self.find(nähster_knoten)
 
     def kürzester_weg_zu(self, _id):
         weg = self.knoten[_id].weg
@@ -119,11 +131,18 @@ class Weg:
         currentPos = self.start
         for kante in self.weg:
             currentPos = kante.anderer_knoten(currentPos)
+        if currentPos != self.knoten[-1]:
+            raise  # "DU HURENSOHN"
         return currentPos
 
     def set(self, other):  # updated diese instanz sodass keine neue erstellt werden muss
         self.weg = other.weg[:]
         self.gewicht = other.gewicht
+
+    def reverse(self):
+        self.start = self.ziel()
+        self.weg = self.weg[::-1]
+        self.knoten = self.knoten[::-1]
 
 
 class Kante:
@@ -152,6 +171,7 @@ class Knoten:
         self.ziel_von = []
         self.überquert_von = []
         self.id = _id
+        self.relevant = True
 
     def __str__(self):
         kantenSTR = ""
@@ -171,10 +191,12 @@ class Graph:
         self.kanten = kanten
         self.kürzeste_wege = {}
 
-    def kürzester_weg_db(self, start):
-        if start not in self.kürzeste_wege:
-            self.kürzeste_wege[start] = Shortest_path_database(start, self)
-        return self.kürzeste_wege[start]
+    def kürzester_weg_db(self, start, blocked=None):
+        if blocked is None or len(blocked) == 0:
+            if start not in self.kürzeste_wege:
+                self.kürzeste_wege[start] = Shortest_path_database(start, self)
+            return self.kürzeste_wege[start]
+        return Shortest_path_database(start, self, geblockte_kanten)
 
     def main(self):
 
@@ -193,7 +215,7 @@ class Graph:
 
 
 def get_input():
-    pfad = "muellabfuhr0.txt"
+    pfad = "muellabfuhr5.txt"
 
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
@@ -226,13 +248,193 @@ class Auto:
         self.position = 0
         self.weg = Weg(0)
 
+    def __str__(self):
+        return f"A{self.id}P{self.position}W{self.weg}"
+
 
 if __name__ == '__main__':
     graph = get_input()
     gesichtete_knoten = []
     besuchte_kanten = []
     autos = [Auto(i) for i in range(verfügbareTage)]  # erstelle 5 Auto Klassen
-    print(len(graph.kanten))
+    start_knoten = graph.knoten_by_id(0)
+    start_knoten.überquert_von += [i for i in range(verfügbareTage)]
+    print("Makiere Start mit allen '!'")
+    while len(besuchte_kanten) < len(graph.kanten):
+        log(len(besuchte_kanten), len(graph.kanten))
+        """        for knoten_id in gesichtete_knoten:  # entfernt alle Fragezeichen da neue generiert werden
+            knoten = graph.knoten_by_id(knoten_id)
+            knoten.ziel_von.clear()  # frage zeichen gelöscht
+            for auto in autos:
+                if auto.position == knoten_id:
+                    if auto.id not in knoten.überquert_von:
+                        knoten.überquert_von.append(auto.id)
+        removelist = []  # hier werden die elemente verlinkt die aus gesichtete knoten entfernt werden sollen
+        for auto in autos:  # jedes auto makiert seine möglichen Zielknoten mit Fragezeichen...
+            position = auto.position
+            knoten = graph.knoten_by_id(position)
+            for kante in knoten.kanten:
+                ziel_id = kante.anderer_knoten(position)
+                ziel_knoten = graph.knoten_by_id(ziel_id)
+                if not ziel_knoten.relevant:
+                    removelist.append(ziel_id)
+                    continue
+                if ziel_id not in gesichtete_knoten:
+                    gesichtete_knoten.append(ziel_id)  # wenn der Knoten nun neu erreicht wurde wird dieser
+                    # in die liste der bekannten knoten hinzugefügt
+                ziel_knoten.ziel_von.append(auto.id)  # Makiert den Knoten
+        for i in removelist:
+            if i in gesichtete_knoten:
+                gesichtete_knoten.remove(i)"""
+        # region Markiere Knoten mit Fragezeichen + identifizieren neu gesichtete knoten + makiere ausrufezeichen
+        removelist = []
+        for knoten_id in gesichtete_knoten:  # entfernt alle Fragezeichen da neue generiert werden
+            knoten = graph.knoten_by_id(knoten_id)
+            knoten.ziel_von.clear()
+            i = 0
+            for kante in knoten.kanten:
+                if kante in besuchte_kanten:
+                    i += 1
+            if i == len(knoten.kanten):
+                knoten.relevant = False
+                removelist.append(knoten_id)
+        for o in removelist:
+            gesichtete_knoten.remove(o)
+        # region gehe bei fehlerhaften bewegungen zurück
+        for i in range(len(autos)):
+
+            while len(autos[i].weg.weg) > 0:
+                letzte_kante = autos[i].weg.weg[-1]
+                zielknoten = graph.knoten_by_id(autos[i].position)
+                if zielknoten.relevant: break
+                überschneidung = False
+                for auto in autos[i+1:]:
+                    if letzte_kante in auto.weg.weg:
+                        überschneidung = True
+                        break
+                if not überschneidung: break
+                autos[i].weg.remove(letzte_kante)
+                autos[i].position = autos[i].weg.ziel()
+                zielknoten.überquert_von.remove(autos[i].id)
+        # endregion
+        print("Alle Fragezeichen löschen")
+        for auto in autos:
+            if auto.position not in gesichtete_knoten:
+                gesichtete_knoten.append(auto.position)
+            knoten = graph.knoten_by_id(auto.position)
+            for kante in knoten.kanten:
+                ziel_id = kante.anderer_knoten(auto.position)
+
+                ziel = graph.knoten_by_id(ziel_id)
+                if not ziel.relevant: continue
+                if ziel_id not in gesichtete_knoten:
+                    gesichtete_knoten.append(ziel_id)
+                ziel.ziel_von.append(auto.id)  # fragezeichen wird hinzu gefügt
+        # endregion
+
+        # region sortierung der gesichteten knoten zuerst die die Fragezeichen haben aber so wenige haben wie geht,
+        # unter denen dann aufsteigend nach ausrufezeichen und zum schluss die die keine Fragezeichen haben.
+        gk = gesichtete_knoten
+        print("Sortiere gesichtete Knoten:", gesichtete_knoten)
+        for _ in gesichtete_knoten:
+            if len(gk) == 0: input("OH!????")
+
+            for i in range(len(gk) - 1):
+                knoten_id = gk[i]
+                knotA = graph.knoten_by_id(knoten_id)
+                knoten_id2 = gk[i + 1]
+                knotB = graph.knoten_by_id(knoten_id2)
+                a_hat_fragezeichen = len(knotA.ziel_von) > 0
+                b_keine_fragezeichen = len(knotB.ziel_von) == 0
+                a_weniger_fragezeichen = len(knotA.ziel_von) < len(knotB.ziel_von)
+
+                a_gleichviele_fragezeichen = len(knotA.ziel_von) == len(knotB.ziel_von)
+
+                a_nicht_mehr_ausrufezeichen = not len(knotA.überquert_von) > len(knotB.überquert_von)
+                if a_hat_fragezeichen:
+                    if b_keine_fragezeichen or a_weniger_fragezeichen or (
+                            a_gleichviele_fragezeichen and a_nicht_mehr_ausrufezeichen):
+                        continue  # nicht tauschen
+                gk[i], gk[i + 1] = knoten_id2, knoten_id
+        print("Ergebnis:", gesichtete_knoten)
+        # endregion
+
+        # region finde das nähste auto und sein weg zu dem knoten
+        for knoten_id in gesichtete_knoten:
+            print("Probiere Knoten:", knoten_id)
+            knoten = graph.knoten_by_id(knoten_id)
+            geblockte_kanten = []
+            for kante in knoten.kanten:
+                if kante in besuchte_kanten:
+                    geblockte_kanten.append(kante)
+            if len(geblockte_kanten) == len(knoten.kanten):
+                knoten.relevant = False
+                print("nächster versuch")
+                continue
+            wege = graph.kürzester_weg_db(knoten_id, geblockte_kanten)
+            print("Wähle auto")
+            bestes_auto = None
+            strecketotal = float("inf")
+            bester_weg = None
+            for auto in autos:
+                weg = wege.kürzester_weg_zu(auto.position).copy()
+                tmp_strecketotal = weg.gewicht + auto.weg.gewicht
+                if strecketotal > tmp_strecketotal and weg.gewicht != 0:
+                    bestes_auto = auto
+                    weg.reverse()
+                    bester_weg = weg
+                    strecketotal = tmp_strecketotal
+            if bestes_auto is None: continue
+            print("Gefunden:", bestes_auto)
+            print("Zusätzlicher weg", bester_weg)
+            for kante in bester_weg.weg:
+                if kante not in besuchte_kanten:
+                    besuchte_kanten.append(kante)
+            for knoten_id in bester_weg.knoten[1:]:
+                knoten = graph.knoten_by_id(knoten_id)
+                knoten.überquert_von.append(bestes_auto.id)
+                print("markiere", knoten_id, f"mit !{bestes_auto.id}")
+
+            bestes_auto.weg.add(bester_weg)
+            bestes_auto.position = knoten_id
+            print("Bestes auto:", bestes_auto.id, "Weg", bestes_auto.weg)
+            # region zusatz checks
+
+            while len(besuchte_kanten) < len(
+                    graph.kanten):  # knoten die nur 2 Kanten haben können weiter überfahren werden da es nur eine möglichkeit
+                # fort zu fahren, Wenden ist depriorisisert
+                if len(knoten.kanten) != 2: break
+                for kante in knoten.kanten:
+                    if kante not in bestes_auto.weg.weg:
+                        print("Führe weg fort mit", kante)
+                        bestes_auto.weg.append(kante)
+                        bestes_auto.position = bestes_auto.weg.ziel()
+                        knoten = graph.knoten_by_id(bestes_auto.position)
+                        knoten.überquert_von.append(bestes_auto.id)
+                        besuchte_kanten.append(kante)
+                        print("markiere", knoten_id, f"mit !{bestes_auto.id}")
+                        break
+
+
+            # endregion
+
+            break
+
+    rückwege = graph.kürzester_weg_db(0)
+    for auto in autos:
+        rw = rückwege.kürzester_weg_zu(auto.position).copy()
+        rw.reverse()
+        auto.weg.add(rw)
+
+    # region OUTPUT
+    for tag in range(verfügbareTage):
+        print("Tag", tag, ":")
+        print(autos[tag].weg)
+        print()
+    # endregion
+
+    # region tmp
+    """print(len(graph.kanten))
     while len(besuchte_kanten) < len(graph.kanten):
         for tag in range(verfügbareTage):
             print("Tag", tag, ":")
@@ -264,10 +466,8 @@ if __name__ == '__main__':
         anzahl_record_zeichen = float("inf")
         anzahl_record_fragezeichen = float("inf")
         potenzielle_knoten = []
-        # region finde potenzielle knoten heraus (mit minimum an Fragezeichen)
+        # region sortiere gesichtete Knoten aufsteigend nach 1.insgesammte Zeichen 2. Fragezeichen
         for _ in gesichtete_knoten:
-            # TODO sortiere die Knoten nach den Regeln des Auswahlverfahrens einen neuen Knoten zu finden,
-            #  wie in Paint beschrieben
             for knoten_id in gesichtete_knoten:
                 knoten = graph.knoten_by_id(knoten_id)
                 anzahl_fragezeichen = len(knoten.ziel_von)
@@ -392,15 +592,7 @@ if __name__ == '__main__':
             outer_auto.weg.append(neuer_weg)
             outer_auto.position = nächster_knoten.id
             # endregion
-
-    # region OUTPUT
-    for tag in range(verfügbareTage):
-        print("Tag", tag, ":")
-        print(autos[tag].weg)
-        print()
-    # endregion
-
-    # region tmp
+"""
     """
         # region Knoten gesucht: es muss eine neue Kante überquert werden. diese Kante muss die größte streck haben.
         # Es Wird das Auto gewählt welches am wenigsten strecke haben wird
