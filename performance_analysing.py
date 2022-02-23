@@ -13,9 +13,6 @@ class time_analysing:
         currenttime = time.time()
         fromstart = currenttime - self.start
         fromlastpoint = currenttime - self.delta
-
-        print("Reaching Point:", message)
-        print("It took:", fromstart, "sec")
-        print("It took from lastpoint:", fromlastpoint, f"sec. LP({self.lastmessage})")
+        print(message, "Currenttime:", fromstart, "since last check:", fromlastpoint)
         self.delta = currenttime
         self.lastmessage = message
