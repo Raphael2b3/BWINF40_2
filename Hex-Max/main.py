@@ -11,383 +11,304 @@ def timer_stop():
     perf.set_time_point("Stop")
 
 
-class Shortest_path_database:
+class Ziffer:
+    """
+        Eine Ziffer hat 7 positionen mit die mit stichen belegt werden können
+          _0_
+        3|_1_|4
+        5|_2_|6
 
-    def __init__(self, _start_id, graph, geblockte_kanten):
-        n_knoten = len(graph.knoten)
-        self.start = _start_id
-        self.INFWEG = Weg("inf")
+         _
+        |_  = F =^ [1,1,0,1,0,1,0] // 1 = True; 0 = False
+        |
 
-        wege = [None for _ in range(n_knoten)]
-        wege[_start_id] = Weg(_start_id)
-        distanzen = [float("inf") for _ in range(n_knoten)]
-        fertige = [False for _ in range(n_knoten)]
-        knoten = graph.knoten
+        wir erstellen Listen die die Hexadezimalzahlen abbilden können.
+        """
+    models = {
+        '0': [True, False, True, True, True, True, True],
+        '1': [False, False, False, False, True, False, True],
+        '2': [True, True, True, False, True, True, False],
+        '3': [True, True, True, False, True, False, True],
+        '4': [False, True, False, True, True, False, True],
+        '5': [True, True, True, True, False, False, True],
+        '6': [True, True, True, True, False, True, True],
+        '7': [True, False, False, False, True, False, True],
+        '8': [True, True, True, True, True, True, True],
+        '9': [True, True, True, True, True, False, True],
+        'A': [True, True, False, True, True, True, True],
+        'B': [False, True, True, True, False, True, True],
+        'C': [True, False, True, True, False, True, False],
+        'D': [False, True, True, False, True, True, True],
+        'E': [True, True, True, True, False, True, False],
+        'F': [True, True, False, True, False, True, False]
+    }
 
-        # region Daijkstra Algorithm iterative
-        betrachteter_knoten_id = _start_id
+    def __init__(self, char):
+        self.positions = Ziffer.models[char][:]  # kopiere die Instanz sodass keine Referenz mehr entsteht
+        self.probieren_index = 0
+        self.bekommt_von = []
+        self.char = char
 
-        while False in fertige:
-            betrachteter_knoten = knoten[betrachteter_knoten_id]
+    def aktionen_zum_ziel(self, ziel_char):
+        self.char = ziel_char
+        model = Ziffer.models[ziel_char]
+        wegnehmen = 0
+        hinzulegen = 0
 
-            fertige[betrachteter_knoten_id] = True
-            weg = wege[betrachteter_knoten_id]
+        for i in range(7):
+            if not model[i] == self.positions[i]:
+                if model[i]:
+                    hinzulegen += 1
+                else:
+                    wegnehmen += 1
+        return wegnehmen, hinzulegen
 
-            distanzen[betrachteter_knoten_id] = weg.gewicht
-
-            for _kante in betrachteter_knoten.kanten:
-                if _kante in geblockte_kanten: continue
-                ziel_id = _kante.anderer_knoten(betrachteter_knoten_id)
-
-                if fertige[ziel_id]: continue
-                if weg.gewicht + _kante.gewicht >= distanzen[ziel_id]: continue
-                ziel_weg = weg.copy()
-                ziel_weg.append(_kante)
-                distanzen[ziel_id] = ziel_weg.gewicht
-                wege[ziel_id] = ziel_weg
-
-            for i in range(n_knoten):
-                if fertige[i]: continue
-                if fertige[betrachteter_knoten_id]:
-                    betrachteter_knoten_id = i
-                    continue
-                if distanzen[betrachteter_knoten_id] <= distanzen[i]: continue
-                betrachteter_knoten_id = i
-            if distanzen[betrachteter_knoten_id] == float("inf"): break
-
-        # endregion
-        self.wege = wege
-        self.fertige = fertige
-
-    def kürzester_weg_zu(self, _id):
-        return self.wege[_id] if self.fertige[_id] else self.INFWEG
-
-
-class Weg:
-    # Quasi wie eine Liste lauter kanten
-    # start: int ID von Knoten
-
-    def __init__(self, start):
-        if start == "inf":
-            self.gewicht = float("inf")
-            return
-        self.start: int = start
-        self.kanten = []
-        self.gewicht = 0
-        self.knoten = [start]
-
-    def append(self, o):
-        self.kanten.append(o)
-        self.gewicht += o.gewicht
-        if o.anderer_knoten(self.knoten[-1]) is None:
-            return False
-        self.knoten.append(o.anderer_knoten(self.knoten[-1]))
-        return True
-
-    def remove(self, _objekt):
-        self.kanten.pop(-1)
-        self.gewicht -= _objekt.gewicht
-        self.knoten.pop(-1)
-
-    def copy(self):
-        t = Weg(self.start)
-        t.kanten = self.kanten[:]
-        t.gewicht = self.gewicht
-        t.knoten = self.knoten[:]
-        return t
-
-    def add(self, other):
-        for i in other.kanten:
-            self.append(i)
-
-    def reverse(self):
-        self.start = self.knoten[-1]
-        self.kanten.reverse()
-        self.knoten.reverse()
-
-    def __str__(self):
-        t = f"__Weg__\nInsgesammte Strecke: {self.gewicht}\nRoute:K{self.start}"
-        currentpos = self.start
-        for w in self.kanten:
-            ziel = w.anderer_knoten(currentpos)
-            t += f"->({w.gewicht})K{ziel}"
-            currentpos = ziel
-        return t
-
-
-class Kante:
-    def __init__(self, start, stop, gewicht, _id):
-        self.id = _id
-        self.start = start
-        self.stop = stop
-        self.gewicht = gewicht
-        self.used = 0
-
-    def __str__(self):
-        return f"Kante: K{self.start} -> K{self.stop}({self.gewicht})"
-
-    def __eq__(self, other):
-        return self.id == other
-
-    def anderer_knoten(self, knoten):
-        if knoten == self.stop:
-            return self.start
-        if knoten == self.start:
-            return self.stop
-
-
-class Knoten:
-
-    def __init__(self, _id, kanten):
-        self.kanten = kanten
-        self.ziel_von = 0
-        self.überquert_von = 0
-        self.id = _id
-
-    def relevant(self):
-        for i in self.kanten:
-            if i.used == 0: return True
-        return False
-
-    def __eq__(self, other):
-        return self.id == other
-
-    def __str__(self):
-        return f"Knoten: {self.id}"
-
-
-class Graph:
-
-    def __init__(self, _knoten, _kanten):
-        self.knoten = _knoten
-        self.kanten = _kanten
-        self.kürzeste_wege: dict[int, Shortest_path_database] = {}
-
-    def kürzester_weg_baum(self, start, blocked=None) -> Shortest_path_database:
-        if blocked is not None and len(blocked) > 0:
-            return Shortest_path_database(start, self, blocked)
-        if start in self.kürzeste_wege:
-            return self.kürzeste_wege[start]
-        _wege = self.kürzeste_wege[start] = Shortest_path_database(start, self, [])
-        return _wege
+    def min_umformung_mit_n_stäbchen(self, n_requested):  # hinzu - wegnehmen = anzahl an zu wenigen stäbchen im system
+        # wir wollen eine Ziffer finden die - n_requested bzw
+        global aktionen_übrig
+        rekord = float("inf")
+        erfolg = False
+        for char in self.models:
+            wegnehmen, hinzulegen = self.aktionen_zum_ziel(char)
+            if wegnehmen - hinzulegen == n_requested:
+                if max((wegnehmen, hinzulegen)) <= aktionen_übrig:
+                    erfolg = True
+                    rekord = max((wegnehmen, hinzulegen)) if rekord > max((wegnehmen, hinzulegen)) else rekord
+        return erfolg, rekord
 
 
 def get_input():
-    pfad = "muellabfuhr8.txt"
+    pfad = "hexmax1.txt"
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     zeilen.pop(-1)
-    kanten = []  # sammelt alle gegebenen Kanten
-    for i in range(1, len(zeilen)):  # ab Zeile i:1 werden die Würfel definiert
-        wertederzeile = zeilen[i].split(" ")
-        start = int(wertederzeile[0])
-        stop = int(wertederzeile[1])
-        gewicht = int(wertederzeile[2])
-        kanten.append(Kante(start, stop, gewicht, i - 1))
 
-    knoten = []
-    zeile1_werte = zeilen[0].split(" ")
-    for knotenID in range(int(zeile1_werte[0])):
-        temp_kanten = []
-        for kante in kanten:
-            if kante.start == knotenID or kante.stop == knotenID:
-                temp_kanten.append(kante)
-        knoten.append(Knoten(knotenID, temp_kanten))
-    return Graph(knoten, kanten)
+    ziffern = []  # sammelt alle Ziffern
+    print(zeilen[0])
+    for char in zeilen[0]:
+        ziffern.append(Ziffer(char))
+    aktionen = int(zeilen[1])
+    print("Aktionen", aktionen)
+    return ziffern, aktionen
 
+
+def print_ziffern(list_ziffern):
+    zeile_1 = ""
+    zeile_2 = ""
+    zeile_3 = ""
+
+    for ziffer in list_ziffern:
+        zeile_1 += f" {'_' if ziffer.positions[0] else ' '}  "
+        zeile_2 += f"{'|' if ziffer.positions[3] else ' '}{'_' if ziffer.positions[1] else ' '}{'|' if ziffer.positions[4] else ' '} "
+        zeile_3 += f"{'|' if ziffer.positions[5] else ' '}{'_' if ziffer.positions[2] else ' '}{'|' if ziffer.positions[6] else ' '} "
+
+    print("____")
+    print(zeile_1)
+    print(zeile_2)
+    print(zeile_3)
+    print()
+
+
+def rek(aktuelle_ziffer_index=0):
+    global versuchsliste, aktionen_übrig, offers, requests, ziffern
+    print("\r", '_' * (aktuelle_ziffer_index + 1), aktionen_übrig, end="")
+    if aktuelle_ziffer_index >= len(ziffern) or aktionen_übrig == 0:
+        if 0 == len(offers) == len(requests):
+            return True
+    else:
+        aktuelle_ziffer = ziffern[aktuelle_ziffer_index]
+        for char in versuchsliste:
+            wegnehmen, hinzufügen = aktuelle_ziffer.aktionen_zum_ziel(char)
+            if max((
+                    wegnehmen,
+                    hinzufügen)) > aktionen_übrig:  # wenn nicht genug aktionen_übrig übrig sind um diese ziffer zu ändern
+                continue
+            log = []  # log = [(list, objekt)]
+
+            if wegnehmen > hinzufügen:
+                for _ in range(wegnehmen - hinzufügen):
+                    if len(requests) > 0:
+                        annehmende_ziffer = ziffern[requests[0]]
+                        annehmende_ziffer.bekommt_von.append(aktuelle_ziffer_index)
+                        log.append((annehmende_ziffer.bekommt_von, aktuelle_ziffer_index))
+                    else:
+                        offers.append(aktuelle_ziffer_index)
+                        log.append((offers, aktuelle_ziffer_index))
+            elif hinzufügen > wegnehmen:
+                for _ in range(hinzufügen - wegnehmen):
+                    if len(offers) > 0:  # wenn es angebote gibt
+                        anbietende_ziffer_id = offers[0]
+                        aktuelle_ziffer.bekommt_von.append(anbietende_ziffer_id)
+                        log.append((aktuelle_ziffer.bekommt_von, anbietende_ziffer_id))
+                    else:
+                        offers.append(aktuelle_ziffer_index)
+                        log.append((offers, aktuelle_ziffer_index))
+            aktionen_übrig -= max((wegnehmen, hinzufügen))
+
+            if rek(aktuelle_ziffer_index + 1): return True
+            aktionen_übrig += max((wegnehmen, hinzufügen))
+            for a, b in log:
+                a.remove(b)
+            log.clear()
+    return False
+
+
+def ist_char_möglich(i, char):
+    global ziffern, aktionen_übrig
+    ziffer = ziffern[i]
+    wegnehmen, hinzufügen = ziffer.aktionen_zum_ziel(char)
+    if max((wegnehmen, hinzufügen)) > aktionen_übrig: return False  # ???... >= aktionen_übrig???
+
+    n_gebrauchte_stäbchen = hinzufügen - wegnehmen  # anzahl an zu wenigen stäbchen im system
+
+    for j in range(i + 1, len(ziffern)):  # probiere andere ziffern aus
+        for i in range(n_gebrauchte_stäbchen):
+
+            erfolg, aktionen = ziffer.min_umformung_mit_n_stäbchen(n_gebrauchte_stäbchen)
+            if erfolg:
+                aktionen_übrig -= max((wegnehmen, hinzufügen)) + aktionen
+                return True
+    return False
+
+
+"""
+überprüfe wie viele Streichhölzer du zur verfügung hast:
+
+Schau wie du eine Ziffer erhöhen kannst wenn du Hölzer weg nimmst
+Mach dies für jede Ziffer - die anzahl an weggenommenen Streichhölzern heißt profit_streichhölzer
+
+Wenn die Anzahl an profit_streichhölzern kleiner ist als die Anzahl an verfügbaren aktionen_übrig, müssen wir davon ausgehen 
+dass diese streichhölzer nicht ausreichen werden. Es muss also Ziffern geben die an wert verlieren. 
+
+Wenn das der Fall ist brauchen wir eine Andere Strategie:
+    wir berechnen die Anzahl an streichhölzern die wir allgemein durchs weg nehmen erhalten können.
+
+Die erste Ziffer wird versucht so hoch,
+Deshalb wird ab dem Punkt wo alle verfügbaren Streichhölzer versuchen wir  
+
+----- 
+Der ansatz ist die ersten Ziffern so weit zu optimieren wie es geht
+im ideal Fall ist es also FFFFFFFFFF...F1213B34
+"""  # Idee 1.0
+"""
+Idee 2.0
+
+Jede gegeben Ziffer  des Hexadezimalsystems wird versucht zur höchst möglichen Ziffer umgewandelt zu werden.
+n = 0
+1. Stelle n versuchen zu erst zu (ziffer z) F dann E,D,C,B... bis zum Wert des eigenen Ziffer value,  umgewandelt zu werden
+-> daraus kann das Problem folgen das Stäbchen übrig sind oder gebrauch werden.
+-> Jetzt Schreiben wir einen Algorithmus der um jeden Preis versucht diesen Mangel/Überschuss zu kompensieren.
+    # Hierzu können auch schon die im Request oder Pott verfügbaren Stäbchen verwendet werden. 
+-> Gelingt dies innerhalb der verfügbaren aktionen_übrig. 
+    wird die Ziffer n fest der Ziffer z zu geschrieben. Gehe zu schritt 2.
+-> Gelingt dies nicht wird die nächste ziffer z versucht. => 1
+
+2. Nun wird optimiert:
+-> Es wird ausgerechnet wie viele Aktionen sicher getätigt werden müssen und der überschuss wird in eine Pott-Liste und der Mangel in einer Request-Liste abgespeichert
+n++;=> gehe zu schritt 1.
+    # wenn n das maximum erreicht hat gehe zu => 3.
+
+3.
+weise so effizient wie es geht die stäbchen den Ziffern zu und schreibe für jede Aktion einen Log
+"""
 
 timer_start()
 if __name__ == '__main__':
-    verfügbareTage = 5  # von montag bis freitag sind 5 tage
-    start_position = 0
+    ziffern, aktionen_übrig = get_input()
+    offers = []  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
+    requests = []  # liste von ziffer_ids dessen ziffer striche Anfragen
+    versuchsliste = "FEDCBA987654321"
+    res = ""
+    for ziffer_index in range(len(ziffern)):
+        for char in versuchsliste:
+            if ist_char_möglich(ziffer_index, char):
+                res += char
+                continue
 
-    graph = get_input()
+    print(res)
+    # rek()
 
-    n_besuchtekanten = 0
-    n_kanten = len(graph.kanten)
+    """
+    aktuelle_ziffer = ziffern[0]
+    aktuelle_ziffer_index = 0
+    logs = [ [] for _ in range(len(ziffern))]
+    while True:
+        
+        #- Überprüfung ob noch versuchbare chars übrig sind
+        #    - Fail: Vorherige Ziffer versucht was anderes
+        #- Set: Char; Aktionen(Aufnahme, abgabe)
+        #- Überprüfung ob für die Aktionen genügend n_aktionen übrig sind
+        #    - Fail: Eine anderer char wird überpfrüft
+        
 
-    gesichtete_knoten = []
-    besuchte_kanten = []
-    removelist = []
-    neuestrecke: list[Knoten] = []
+        if not aktuelle_ziffer.probieren_index < len(versuchsliste):
+            aktuelle_ziffer_index -= 1
+            aktuelle_ziffer = ziffern[aktuelle_ziffer_index]
+            continue
 
-    strecken = [Weg(start_position) for i in range(verfügbareTage)]  # erstelle 5 Auto Klassen
+        char = versuchsliste[aktuelle_ziffer.probieren_index]
 
-    start_knoten = graph.knoten[start_position]
-    start_knoten.überquert_von = verfügbareTage
+        wegnehmen, hinzufügen = aktuelle_ziffer.aktionen_zum_ziel(char)
 
-    bar_length = 20
-    barhelper = 0
+        if max((wegnehmen, hinzufügen)) > aktionen_übrig:  # wenn nicht genug aktionen_übrig übrig sind um diese ziffer zu ändern
+            aktuelle_ziffer.probieren_index += 1
+            continue
+        aktionen_übrig = [0, 8, 9, 12]
+        if wegnehmen > hinzufügen:
+            for _ in range(wegnehmen - hinzufügen):
+                if len(requests) > 0:
+                    annehmende_ziffer = ziffern[requests[0]]
+                    annehmende_ziffer.bekommt_von.append(aktuelle_ziffer_index)
+                else:
+                    pot.append(aktuelle_ziffer_index)
 
-    while n_besuchtekanten < n_kanten:
-        # region Prozessbar
-        fortschritt = round(n_besuchtekanten * 100 / n_kanten, 2)
-        print("\r", f"{fortschritt}%",
-              "#" * int(fortschritt * bar_length / 100) + "." * int(bar_length - (fortschritt * bar_length / 100)),
-              end="")
-        if fortschritt > barhelper * 5: barhelper += 1
-        # endregion
+        elif hinzufügen > wegnehmen:
+            for _ in range(hinzufügen - wegnehmen):
+                if len(pot) > 0:  # wenn es angebote gibt
+                    anbietende_ziffer_id = pot[0]
+                    aktuelle_ziffer.bekommt_von.append(anbietende_ziffer_id)
+                else:
+                    pot.append(aktuelle_ziffer_index)
 
-        # region Situation Analysieren
-        # region Fragezeichen erstmal entfernen
-        removelist.clear()
-        for knoten in gesichtete_knoten:  # entfernt alle Fragezeichen da neue generiert werden
-            knoten.ziel_von = 0  # frage zeichen entfernen
-            if not knoten.relevant():  # knoten ist irrelevant
-                removelist.append(knoten)
-        for o in removelist: gesichtete_knoten.remove(o)
-        # endregion
-
-        for strecke in strecken:
-            # region gehe bei fehlerhaften bewegungen zurück
-
-            knoten = graph.knoten[strecke.knoten[-1]]
-            while len(strecke.kanten) > 0:  # grenze
-                letzte_kante = strecke.kanten[-1]
-                überschneidung = False
-                if letzte_kante.used == 1:
-                    break
-                strecke.remove(letzte_kante)
-                letzte_kante.used -= 1
-                knoten.überquert_von -= 1
-            # endregion
-
-            # region makiere Fragezeichen
-            knoten = graph.knoten[
-                strecke.knoten[-1]]  # muss neu deklariert werden da eventuell der letzte knoten sich verändert hat
-            if knoten not in gesichtete_knoten and knoten.relevant(): gesichtete_knoten.append(knoten)
-            for kante in knoten.kanten:
-                ziel_id = kante.anderer_knoten(strecke.knoten[-1])
-                ziel = graph.knoten[ziel_id]
-                if not ziel.relevant(): continue
-                if ziel not in gesichtete_knoten:
-                    gesichtete_knoten.append(ziel)
-                ziel.ziel_von += 1  # fragezeichen wird hinzu gefügt
-            # endregion
-
-        # region checke auch übergangene Knoten
-        for knoten in neuestrecke:
-            for kante in knoten.kanten:
-                ziel_id = kante.anderer_knoten(knoten.id)
-                ziel = graph.knoten[ziel_id]
-                if not ziel.relevant(): continue
-                if ziel not in gesichtete_knoten:
-                    gesichtete_knoten.append(ziel)
-                # fragezeichen wird hinzu gefügt
-
-        # endregion
-
-        # endregion
-
-        # region sortierung der gesichteten knoten zuerst die die Fragezeichen haben aber so wenige haben wie geht,
-        # unter denen dann aufsteigend nach ausrufezeichen und zum schluss die die keine Fragezeichen haben.
-        swap = True
-        while swap:
-            swap = False
-            for i in range(len(gesichtete_knoten) - 1):
-                knotA: Knoten = gesichtete_knoten[i]
-                knotB: Knoten = gesichtete_knoten[i + 1]
-
-                if (knotA.ziel_von == knotB.ziel_von and (knotA.überquert_von < knotB.überquert_von or (
-                        knotA.überquert_von == knotB.überquert_von and len(knotA.kanten) <= len(
-                    knotB.kanten)))) or (
-                        0 < knotA.ziel_von and (knotA.ziel_von < knotB.ziel_von or knotB.ziel_von == 0)): continue
-                gesichtete_knoten[i], gesichtete_knoten[i + 1] = knotB, knotA
-                swap = True
-        # endregion
-
-        # region finde das auto mit der geringsten totalen distanz und sein weg zu dem knoten
-
-        for knoten in gesichtete_knoten:  # da gesichtete_knoten grade sortiert wurde werden jetzt effizient
-            # die knoten überprüft
-            geblockte_kanten = []
-            for kante in knoten.kanten:
-                if kante.used != 0:
-                    geblockte_kanten.append(kante)
-
-            if len(geblockte_kanten) == len(knoten.kanten): continue  # wenn von einem Knoten alle Kanten verwendet
-            # wurden wird dieser ignoriert
-
-            wege = graph.kürzester_weg_baum(knoten.id, geblockte_kanten)
-            # region findet das auto welches am wenigsten strecke zum knoten benötigt
-            beste_strecke = None
-            strecketotal = float("inf")
-            bester_weg = None
-
-            for strecke in strecken:
-                weg = wege.kürzester_weg_zu(strecke.knoten[-1])
-                tmp_strecketotal = weg.gewicht + strecke.gewicht
-                if strecketotal <= tmp_strecketotal or weg.gewicht == 0: continue
-                weg = weg.copy()
-                beste_strecke = strecke
-                weg.reverse()
-                bester_weg = weg
-                strecketotal = tmp_strecketotal
-            # endregion
-
-            if beste_strecke is None: continue  # wenn kein Auto gefunden wurde wird der nächste Knoten ausprobiert
-
-            # region kanten und knoten werden als bekannt makiert
-            for kante in bester_weg.kanten:
-                if kante.used == 0: n_besuchtekanten += 1
-                kante.used += 1
-
-            neuestrecke.clear()
-            for _knoten_id in bester_weg.knoten[1:]:
-                knoten = graph.knoten[_knoten_id]
-                neuestrecke.append(knoten)
-                knoten.überquert_von += 1
-
-            beste_strecke.add(bester_weg)
-            # endregion
-
-            # region Knoten die nur zwei kanten haben werden identifiziert
-            """
-            Knoten die nur 2 Kanten haben können weiter überfahren werden da es nur eine Möglichkeit gibt 
-            fort zu fahren, und zwar auf die nächste kante.
-            """
-            while n_besuchtekanten < n_kanten:
-
-                if len(knoten.kanten) != 2: break
-                for kante in knoten.kanten:
-                    if kante not in beste_strecke.kanten:
-                        beste_strecke.append(kante)
-                        knoten = graph.knoten[beste_strecke.knoten[-1]]
-                        neuestrecke.append(knoten)
-                        knoten.überquert_von += 1
-                        if kante.used == 0: n_besuchtekanten += 1
-                        kante.used += 1
-                        break
-            # endregion
-
-            break
-        # endregion
-
-    # region Rückwege generieren
-    rückwege = graph.kürzester_weg_baum(0)
-    for strecke in strecken:
-        rw = rückwege.kürzester_weg_zu(strecke.knoten[-1]).copy()
-        rw.reverse()
-        strecke.add(rw)
-    # endregion
-
-    # region Ausgabe des Ergebnissen
-
-    print("\n\nErgebnis:")
-    for tag in range(verfügbareTage):
-        print("Tag", tag + 1, ":")
-        print(strecken[tag])
-        print()
-    print("-Ende-")
-
-    for kante in graph.kanten:
-        s = False
-        for auto in strecken:
-            if kante in auto.kanten:
-                s = True
+        aktionen_übrig -= max((wegnehmen, hinzufügen))
+        if aktuelle_ziffer_index >= len(ziffern) or aktionen_übrig == 0:
+            if 0 == len(pot) == len(requests):
+                print()
                 break
-        if not s:
-            print("Ergbnis FALSCH")
-    # endregion
+            aktuelle_ziffer.probieren_index += 1
+            # TODO mach den fehler rückgängig
 
+            continue
+        else:
+            aktuelle_ziffer_index += 1
+            ziffern[aktuelle_ziffer_index].probieren_index = 0
+    """
+
+    # print_ziffern(ziffern)
+    print("Result")
+    for ziff in ziffern:
+        print(ziff.char, end="")
+    print()
 timer_stop()
+
+n = int(input())
+# TODO Löse das algorithmische problem wie unten beschrieben
+"""
+Die Frage ist, wie kann man der anzahl n stäbe an personen verteilen:
+
+bei 6
+kann man
+6,0,0,0,0,0
+5,1,0,0,0,0
+4,2,0,0,0,0
+3,3,0,0,0,0
+1,1,4,0,0,0
+1,2,3,0,0,0
+1,1,1,3,0,0
+1,1,2,2,0,0
+1,1,1,1,2,0
+1,1,1,1,1,1
+das muss man algorithmisch machen 
+
+
+"""
