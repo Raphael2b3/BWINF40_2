@@ -63,22 +63,36 @@ class Ziffer:
                     wegnehmen += 1
         return wegnehmen, hinzulegen
 
-    def min_umformung_mit_n_stäbchen(self, n_requested):  # hinzu - wegnehmen = anzahl an zu wenigen stäbchen im system
-        # wir wollen eine Ziffer finden die - n_requested bzw
+    def min_umformung_mit_n_stäbchen(self, n_requested):  #
+        """
+        Ziel ist eine Ziffer zu finden die n_requested Sticks zu viel im System haben
+        :param n_requested: Anzahl an anfragen die zu befriedigen sind.
+        :return:
+        """
         global aktionen_übrig
         rekord = float("inf")
         erfolg = False
-        for char in self.models:
+        char_ = self.char
+        for char in versuchsliste:
             wegnehmen, hinzulegen = self.aktionen_zum_ziel(char)
             if wegnehmen - hinzulegen == n_requested:
-                if max((wegnehmen, hinzulegen)) <= aktionen_übrig:
+                if min((wegnehmen, hinzulegen)) <= aktionen_übrig:
+                    if not rekord > min((wegnehmen, hinzulegen)): continue
                     erfolg = True
-                    rekord = max((wegnehmen, hinzulegen)) if rekord > max((wegnehmen, hinzulegen)) else rekord
+
+                    rekord = min((wegnehmen, hinzulegen))
+                    #  min weil die übrigen aktionen von außen übernommen werden
+                    char_ = char
+
+        self.char = char_
         return erfolg, rekord
 
 
+    def __str__(self):
+        return self.char
+
 def get_input():
-    pfad = "hexmax1.txt"
+    pfad = "hexmax5.txt"
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     zeilen.pop(-1)
@@ -112,19 +126,17 @@ def print_ziffern(list_ziffern):
 def rek(aktuelle_ziffer_index=0):
     global versuchsliste, aktionen_übrig, offers, requests, ziffern
     print("\r", '_' * (aktuelle_ziffer_index + 1), aktionen_übrig, end="")
-    if aktuelle_ziffer_index >= len(ziffern) or aktionen_übrig == 0:
+    if aktuelle_ziffer_index >= len(ziffern):
         if 0 == len(offers) == len(requests):
             return True
     else:
         aktuelle_ziffer = ziffern[aktuelle_ziffer_index]
         for char in versuchsliste:
             wegnehmen, hinzufügen = aktuelle_ziffer.aktionen_zum_ziel(char)
-            if max((
-                    wegnehmen,
+            if max((wegnehmen,
                     hinzufügen)) > aktionen_übrig:  # wenn nicht genug aktionen_übrig übrig sind um diese ziffer zu ändern
                 continue
             log = []  # log = [(list, objekt)]
-
             if wegnehmen > hinzufügen:
                 for _ in range(wegnehmen - hinzufügen):
                     if len(requests) > 0:
@@ -146,6 +158,9 @@ def rek(aktuelle_ziffer_index=0):
             aktionen_übrig -= max((wegnehmen, hinzufügen))
 
             if rek(aktuelle_ziffer_index + 1): return True
+            yarak = letzte_verteilung(aktuelle_ziffer_index)
+            # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
+            if yarak: return True
             aktionen_übrig += max((wegnehmen, hinzufügen))
             for a, b in log:
                 a.remove(b)
@@ -153,25 +168,88 @@ def rek(aktuelle_ziffer_index=0):
     return False
 
 
-def ist_char_möglich(i, char):
+def permute(l, n, out, top):
+    if n == 0:
+        out.append(l[:])
+    else:
+        for i in range(min(n, top), 0, -1):
+            l.append(i)
+            permute(l, n - i, out, i)
+            l.remove(i)
+    return out
+
+
+def letzte_verteilung(index):  # index: index der letzten festgelegten ziffer
+    # TODO See below
+    """
+    Wann diese Funktion aufgerufen werden muss ist noch nicht wirklich klar.
+    :param index:
+    :return:
+    """
+
+
     global ziffern, aktionen_übrig
-    ziffer = ziffern[i]
-    wegnehmen, hinzufügen = ziffer.aktionen_zum_ziel(char)
-    if max((wegnehmen, hinzufügen)) > aktionen_übrig: return False  # ???... >= aktionen_übrig???
+    if not 0 in (len(offers), len(requests)):
+        print("Error, offers und requests könnten sich ausgleichen")
+        raise
+    a = max(len(offers), len(requests))
+    m = 1 if len(offers) == 0 else -1  # Multiplikator, 1 wenn noch stäbchen in ziffern systemen fehlen,
+    # -1 wenn es einen überschuss gibt
+    permutations = permute([], a, [], a) # TODO do not use permutations and find the correct awnser first try, you can doit
+    blocklist = []
+    perm_success = False
+    sum_aktionen = 0
+    permutations.reverse()
+    for perm in permutations:
+        blocklist.clear()
+        sum_aktionen = 0
+        for n in perm:
+            best_akt = float("inf")
+            best_i = 0
+            erfolg = False
+            for i in range(index+1, len(ziffern)):
+                if i in blocklist: continue
+                erfolg, aktionen = ziffern[i].min_umformung_mit_n_stäbchen(n*m)
+                if not erfolg or best_akt <= aktionen: continue
+                sum_aktionen += aktionen
+                if aktionen_übrig - sum_aktionen < 0:
+                    erfolg = False
+                    break
+                best_i = i
+                best_akt = aktionen
 
-    n_gebrauchte_stäbchen = hinzufügen - wegnehmen  # anzahl an zu wenigen stäbchen im system
+            if not erfolg:
+                perm_success = False
+                break
+            else:
+                perm_success = True
+            blocklist.append(best_i)
+        if perm_success: break
+    if perm_success:
+        aktionen_übrig -= sum_aktionen
+    return perm_success
 
-    for j in range(i + 1, len(ziffern)):  # probiere andere ziffern aus
-        for i in range(n_gebrauchte_stäbchen):
 
-            erfolg, aktionen = ziffer.min_umformung_mit_n_stäbchen(n_gebrauchte_stäbchen)
-            if erfolg:
-                aktionen_übrig -= max((wegnehmen, hinzufügen)) + aktionen
-                return True
-    return False
 
+
+timer_start()
+if __name__ == '__main__':
+    ziffern, aktionen_übrig = get_input()
+    offers = []  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
+    requests = []  # liste von ziffer_ids dessen ziffer striche Anfragen
+    versuchsliste = "FEDCBA987654321"
+    rek()
+
+    # print_ziffern(ziffern)
+    print("Result")
+    for ziff in ziffern:
+        print(ziff.char, end="")
+    print()
+timer_stop()
 
 """
+Idee 1.0
+
 überprüfe wie viele Streichhölzer du zur verfügung hast:
 
 Schau wie du eine Ziffer erhöhen kannst wenn du Hölzer weg nimmst
@@ -189,7 +267,11 @@ Deshalb wird ab dem Punkt wo alle verfügbaren Streichhölzer versuchen wir
 ----- 
 Der ansatz ist die ersten Ziffern so weit zu optimieren wie es geht
 im ideal Fall ist es also FFFFFFFFFF...F1213B34
+
+Umsetzung
+
 """  # Idee 1.0
+
 """
 Idee 2.0
 
@@ -210,105 +292,15 @@ n++;=> gehe zu schritt 1.
 
 3.
 weise so effizient wie es geht die stäbchen den Ziffern zu und schreibe für jede Aktion einen Log
-"""
-
-timer_start()
-if __name__ == '__main__':
-    ziffern, aktionen_übrig = get_input()
-    offers = []  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
-    requests = []  # liste von ziffer_ids dessen ziffer striche Anfragen
-    versuchsliste = "FEDCBA987654321"
-    res = ""
-    for ziffer_index in range(len(ziffern)):
-        for char in versuchsliste:
-            if ist_char_möglich(ziffer_index, char):
-                res += char
-                continue
-
-    print(res)
-    # rek()
-
-    """
-    aktuelle_ziffer = ziffern[0]
-    aktuelle_ziffer_index = 0
-    logs = [ [] for _ in range(len(ziffern))]
-    while True:
-        
-        #- Überprüfung ob noch versuchbare chars übrig sind
-        #    - Fail: Vorherige Ziffer versucht was anderes
-        #- Set: Char; Aktionen(Aufnahme, abgabe)
-        #- Überprüfung ob für die Aktionen genügend n_aktionen übrig sind
-        #    - Fail: Eine anderer char wird überpfrüft
-        
-
-        if not aktuelle_ziffer.probieren_index < len(versuchsliste):
-            aktuelle_ziffer_index -= 1
-            aktuelle_ziffer = ziffern[aktuelle_ziffer_index]
-            continue
-
-        char = versuchsliste[aktuelle_ziffer.probieren_index]
-
-        wegnehmen, hinzufügen = aktuelle_ziffer.aktionen_zum_ziel(char)
-
-        if max((wegnehmen, hinzufügen)) > aktionen_übrig:  # wenn nicht genug aktionen_übrig übrig sind um diese ziffer zu ändern
-            aktuelle_ziffer.probieren_index += 1
-            continue
-        aktionen_übrig = [0, 8, 9, 12]
-        if wegnehmen > hinzufügen:
-            for _ in range(wegnehmen - hinzufügen):
-                if len(requests) > 0:
-                    annehmende_ziffer = ziffern[requests[0]]
-                    annehmende_ziffer.bekommt_von.append(aktuelle_ziffer_index)
-                else:
-                    pot.append(aktuelle_ziffer_index)
-
-        elif hinzufügen > wegnehmen:
-            for _ in range(hinzufügen - wegnehmen):
-                if len(pot) > 0:  # wenn es angebote gibt
-                    anbietende_ziffer_id = pot[0]
-                    aktuelle_ziffer.bekommt_von.append(anbietende_ziffer_id)
-                else:
-                    pot.append(aktuelle_ziffer_index)
-
-        aktionen_übrig -= max((wegnehmen, hinzufügen))
-        if aktuelle_ziffer_index >= len(ziffern) or aktionen_übrig == 0:
-            if 0 == len(pot) == len(requests):
-                print()
-                break
-            aktuelle_ziffer.probieren_index += 1
-            # TODO mach den fehler rückgängig
-
-            continue
-        else:
-            aktuelle_ziffer_index += 1
-            ziffern[aktuelle_ziffer_index].probieren_index = 0
-    """
-
-    # print_ziffern(ziffern)
-    print("Result")
-    for ziff in ziffern:
-        print(ziff.char, end="")
-    print()
-timer_stop()
-
-n = int(input())
-# TODO Löse das algorithmische problem wie unten beschrieben
-"""
-Die Frage ist, wie kann man der anzahl n stäbe an personen verteilen:
-
-bei 6
-kann man
-6,0,0,0,0,0
-5,1,0,0,0,0
-4,2,0,0,0,0
-3,3,0,0,0,0
-1,1,4,0,0,0
-1,2,3,0,0,0
-1,1,1,3,0,0
-1,1,2,2,0,0
-1,1,1,1,2,0
-1,1,1,1,1,1
-das muss man algorithmisch machen 
-
+"""  # idee 2.0
 
 """
+__Idee 3.0
+
+Eine Mischung aus 1.0 und 2.0
+
+Die Möglchkeiten werden gebruteforced nur das vom Bestcasesceniario (FFFFFF...F) ausgegangen wird (1.0).  
+Sobald eine Ziffer die verfügbaren Aktionen ausgeschöpft hat, wird nachgeprüft ob diese Ziffer allgemein als 
+letztmögliche verfügbar ist. (2.0)
+
+"""  # idee 3.0 aktuellste
