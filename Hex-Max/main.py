@@ -136,12 +136,15 @@ def rek(aktuelle_ziffer_index=0):
             if max((wegnehmen,
                     hinzufügen)) > aktionen_übrig:  # wenn nicht genug aktionen_übrig übrig sind um diese ziffer zu ändern
                 continue
-            log = []  # log = [(list, objekt)]
+            log = []  # log = [(list, objekt)] later remove objekt from list
+            log2 = []  # log2 = [(list, objekt)] later append objekt to list
             if wegnehmen > hinzufügen:
                 for _ in range(wegnehmen - hinzufügen):
                     if len(requests) > 0:
                         annehmende_ziffer = ziffern[requests[0]]
                         annehmende_ziffer.bekommt_von.append(aktuelle_ziffer_index)
+                        o = requests.pop(0)
+                        log2.append((requests,o))
                         log.append((annehmende_ziffer.bekommt_von, aktuelle_ziffer_index))
                     else:
                         offers.append(aktuelle_ziffer_index)
@@ -151,6 +154,8 @@ def rek(aktuelle_ziffer_index=0):
                     if len(offers) > 0:  # wenn es angebote gibt
                         anbietende_ziffer_id = offers[0]
                         aktuelle_ziffer.bekommt_von.append(anbietende_ziffer_id)
+                        o = offers.pop(0)
+                        log2.append((offers, o))
                         log.append((aktuelle_ziffer.bekommt_von, anbietende_ziffer_id))
                     else:
                         offers.append(aktuelle_ziffer_index)
@@ -164,7 +169,9 @@ def rek(aktuelle_ziffer_index=0):
             aktionen_übrig += max((wegnehmen, hinzufügen))
             for a, b in log:
                 a.remove(b)
-            log.clear()
+            for a, b in log2:
+                a.append(b)
+
     return False
 
 
@@ -186,6 +193,40 @@ def letzte_verteilung(index):  # index: index der letzten festgelegten ziffer
     :param index:
     :return:
     """
+    """permutations = permute([], a, [], a) # TODO do not use permutations and find the correct awnser first try, you can doit
+       blocklist = []
+       perm_success = False
+       sum_aktionen = 0
+       permutations.reverse()
+       for perm in permutations:
+           blocklist.clear()
+           sum_aktionen = 0
+           for n in perm:
+               best_akt = float("inf")
+               best_i = 0
+               erfolg = False
+               for i in range(index+1, len(ziffern)):
+                   if i in blocklist: continue
+                   erfolg, aktionen = ziffern[i].min_umformung_mit_n_stäbchen(n*m)
+                   if not erfolg or best_akt <= aktionen: continue
+                   sum_aktionen += aktionen
+                   if aktionen_übrig - sum_aktionen < 0:
+                       erfolg = False
+                       break
+                   best_i = i
+                   best_akt = aktionen
+
+               if not erfolg:
+                   perm_success = False
+                   break
+               else:
+                   perm_success = True
+               blocklist.append(best_i)
+           if perm_success: break
+       if perm_success:
+           aktionen_übrig -= sum_aktionen
+       return perm_success
+   """
 
 
     global ziffern, aktionen_übrig
@@ -195,40 +236,9 @@ def letzte_verteilung(index):  # index: index der letzten festgelegten ziffer
     a = max(len(offers), len(requests))
     m = 1 if len(offers) == 0 else -1  # Multiplikator, 1 wenn noch stäbchen in ziffern systemen fehlen,
     # -1 wenn es einen überschuss gibt
-    permutations = permute([], a, [], a) # TODO do not use permutations and find the correct awnser first try, you can doit
-    blocklist = []
-    perm_success = False
-    sum_aktionen = 0
-    permutations.reverse()
-    for perm in permutations:
-        blocklist.clear()
-        sum_aktionen = 0
-        for n in perm:
-            best_akt = float("inf")
-            best_i = 0
-            erfolg = False
-            for i in range(index+1, len(ziffern)):
-                if i in blocklist: continue
-                erfolg, aktionen = ziffern[i].min_umformung_mit_n_stäbchen(n*m)
-                if not erfolg or best_akt <= aktionen: continue
-                sum_aktionen += aktionen
-                if aktionen_übrig - sum_aktionen < 0:
-                    erfolg = False
-                    break
-                best_i = i
-                best_akt = aktionen
-
-            if not erfolg:
-                perm_success = False
-                break
-            else:
-                perm_success = True
-            blocklist.append(best_i)
-        if perm_success: break
-    if perm_success:
-        aktionen_übrig -= sum_aktionen
-    return perm_success
-
+    print()
+    print("sadsad")
+    input()
 
 
 
