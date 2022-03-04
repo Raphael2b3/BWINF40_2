@@ -65,24 +65,23 @@ class Ziffer:
 
     def min_umformung_mit_n_stäbchen(self, n_requested):  #
         """
-        Ziel ist eine Ziffer zu finden die n_requested Sticks zu viel im System haben
+        Ziel ist eine Ziffer zu finden die n_requested Sticks zu viel im System hat
         :param n_requested: Anzahl an anfragen die zu befriedigen sind.
         :return:
         """
-        global aktionen_übrig
+        global aktionen_übrig, versuchsliste
         rekord = float("inf")
         erfolg = False
         char_ = self.char
         for char in versuchsliste:
             wegnehmen, hinzulegen = self.aktionen_zum_ziel(char)
-            if wegnehmen - hinzulegen == n_requested:
-                if min((wegnehmen, hinzulegen)) <= aktionen_übrig:
-                    if not rekord > min((wegnehmen, hinzulegen)): continue
-                    erfolg = True
-
-                    rekord = min((wegnehmen, hinzulegen))
-                    #  min weil die übrigen aktionen von außen übernommen werden
-                    char_ = char
+            if wegnehmen - hinzulegen != n_requested: continue
+            if min((wegnehmen, hinzulegen)) > aktionen_übrig: continue
+            if not rekord > min((wegnehmen, hinzulegen)): continue
+            erfolg = True
+            rekord = min((wegnehmen, hinzulegen))
+            #  min weil die übrigen aktionen von außen übernommen werden
+            char_ = char
 
         self.char = char_
         return erfolg, rekord
@@ -144,7 +143,7 @@ def rek(aktuelle_ziffer_index=0):
                         annehmende_ziffer = ziffern[requests[0]]
                         annehmende_ziffer.bekommt_von.append(aktuelle_ziffer_index)
                         o = requests.pop(0)
-                        log2.append((requests,o))
+                        log2.append((requests, o))
                         log.append((annehmende_ziffer.bekommt_von, aktuelle_ziffer_index))
                     else:
                         offers.append(aktuelle_ziffer_index)
@@ -186,11 +185,17 @@ def permute(l, n, out, top):
     return out
 
 
-def letzte_verteilung(index):  # index: index der letzten festgelegten ziffer
-    # TODO See below
+def letzte_verteilung(index):
     """
-    Wann diese Funktion aufgerufen werden muss ist noch nicht wirklich klar.
-    :param index:
+    Diese Funktion löst dieses Problem:\n
+    Mit einer Anzahl N an übrigen Aktionen und einer menge von {index+1,...,len(ziffern)} Ziffern muss der Mangel/Überschuss\n
+    an Stäbchen ausgeglichen werden:\n
+    Bsp Situationen:\n
+    4 stäbchen müssen noch auf 3 ziffern verteilt werden\n
+    4 stäbchen müssen noch von 3 ziffern weggenommen werden\n
+
+
+    :param index: index der letzten festgelegten ziffer
     :return:
     """
     """permutations = permute([], a, [], a) # TODO do not use permutations and find the correct awnser first try, you can doit
@@ -230,20 +235,35 @@ def letzte_verteilung(index):  # index: index der letzten festgelegten ziffer
 
 
     global ziffern, aktionen_übrig
-    if not 0 in (len(offers), len(requests)):
-        print("Error, offers und requests könnten sich ausgleichen")
-        raise
     a = max(len(offers), len(requests))
     m = 1 if len(offers) == 0 else -1  # Multiplikator, 1 wenn noch stäbchen in ziffern systemen fehlen,
-    # -1 wenn es einen überschuss gibt
-    print()
-    print("sadsad")
-    input()
+    return rek2(a, m, index, [])
 
 
+def rek2(zielausgleich, m, index, blocked):
+    global aktionen_übrig, ziffern
+    if zielausgleich == 0: return True
+    for a in range(zielausgleich, 0, -1):
+        best_i = 0
+        rekord_aktion = float("inf")
+        for i in range(index+1, len(ziffern)):
+            if i in blocked: continue
+            erfolg, min_aktion = ziffern[i].min_umformung_mit_n_stäbchen(a*m)
+            if not erfolg: continue
+            if min_aktion > aktionen_übrig or rekord_aktion <= min_aktion: continue
+            best_i = i
+            rekord_aktion = min_aktion
+        if rekord_aktion == float("inf"): continue
+        blocked.append(best_i)
+        aktionen_übrig -= rekord_aktion
+        if rek2(zielausgleich-a, m, index, blocked): return True
+        blocked.remove(best_i)
+        aktionen_übrig += rekord_aktion
+    return False
 
 timer_start()
 if __name__ == '__main__':
+
     ziffern, aktionen_übrig = get_input()
     offers = []  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
     requests = []  # liste von ziffer_ids dessen ziffer striche Anfragen
@@ -255,6 +275,7 @@ if __name__ == '__main__':
     for ziff in ziffern:
         print(ziff.char, end="")
     print()
+
 timer_stop()
 
 """
