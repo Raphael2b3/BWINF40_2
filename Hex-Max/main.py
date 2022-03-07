@@ -91,12 +91,28 @@ class Ziffer:
         self.char = char_
         return erfolg, rekord
 
+    def change_to(self, char):
+        wegnehmen, hinzulegen = self.aktionen_zum_ziel(char)
+
+        if wegnehmen > hinzulegen:  # zu viele Sticks im System
+            model = Ziffer.models[char]
+
+            for i in range(7):
+                if not model[i] == self.positions[i]:
+                    if model[i]:
+                        hinzulegen += 1
+                    else:
+                        wegnehmen += 1
+
+        return
+    def index_fehlend(self):
+        pass
     def __str__(self):
         return self.char
 
 
 def get_input():
-    pfad = "hexmax5.txt"
+    pfad = "hexmax1.txt"
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     zeilen.pop(-1)
@@ -127,11 +143,8 @@ def print_ziffern(list_ziffern):
     print()
 
 
-# TODO Finde die bugs die du eigentlich schon kennst aber du huso hast deine Festplatte formatiert Spasst!
 def rek(aktuelle_ziffer_index=0):
     global versuchsliste, aktionen_übrig, offers, requests, ziffern
-    if aktionen_übrig < 0:
-        input("Errrorr")
     if aktuelle_ziffer_index >= len(ziffern) or aktionen_übrig == 0:
         return 0 == len(offers) == len(requests)
     else:
@@ -176,8 +189,10 @@ def rek(aktuelle_ziffer_index=0):
                         aktionen += 1
             aktionen_übrig -= aktionen
             if aktionen_übrig >= 0:
-                if letzte_verteilung(aktuelle_ziffer_index):  # wenn die jetzige ziffer funktionieren kann
-                    if rek(aktuelle_ziffer_index + 1): return True
+                  # wenn die jetzige ziffer funktionieren kann
+                if rek(aktuelle_ziffer_index + 1): return True
+                yarak = letzte_verteilung(aktuelle_ziffer_index)
+                if yarak: return True
                 # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
 
             aktionen_übrig += aktionen
@@ -212,40 +227,6 @@ def letzte_verteilung(index):
     :param index: index der letzten festgelegten ziffer
     :return:
     """
-    """permutations = permute([], a, [], a) # TODO do not use permutations and find the correct awnser first try, you can doit
-       blocklist = []
-       perm_success = False
-       sum_aktionen = 0
-       permutations.reverse()
-       for perm in permutations:
-           blocklist.clear()
-           sum_aktionen = 0
-           for n in perm:
-               best_akt = float("inf")
-               best_i = 0
-               erfolg = False
-               for i in range(index+1, len(ziffern)):
-                   if i in blocklist: continue
-                   erfolg, aktionen = ziffern[i].min_umformung_mit_n_stäbchen(n*m)
-                   if not erfolg or best_akt <= aktionen: continue
-                   sum_aktionen += aktionen
-                   if aktionen_übrig - sum_aktionen < 0:
-                       erfolg = False
-                       break
-                   best_i = i
-                   best_akt = aktionen
-
-               if not erfolg:
-                   perm_success = False
-                   break
-               else:
-                   perm_success = True
-               blocklist.append(best_i)
-           if perm_success: break
-       if perm_success:
-           aktionen_übrig -= sum_aktionen
-       return perm_success
-   """
 
     global ziffern, aktionen_übrig
     a = max(len(offers), len(requests))
@@ -275,6 +256,7 @@ def rek2(zielausgleich, m, index, blocked):
     return False
 
 
+
 timer_start()
 if __name__ == '__main__':
     """
@@ -284,11 +266,15 @@ if __name__ == '__main__':
     
     """
     ziffern, aktionen_übrig = get_input()  # input aus Text-Datei
+    t_akt = aktionen_übrig
     offers = []  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
     requests = []  # liste von ziffer_ids dessen ziffer striche Anfragen
     versuchsliste = "FEDCBA987654321"  # Hex-Zahlen zum durch iterieren
     rek()  # haupt funktion
+    ziffern[0].aktionen_zum_ziel(ziffern[0].char)
 
+
+    #  TODO erfülle die Darstellung der Schritte um zum Ziel zu kommen
     # print_ziffern(ziffern)
     print("Result")
     for ziff in ziffern:
