@@ -91,7 +91,7 @@ class Ziffer:
         return self.char
 
 def get_input():
-    pfad = "hexmax5.txt"
+    pfad = "hexmax0.txt"
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     zeilen.pop(-1)
@@ -121,7 +121,7 @@ def print_ziffern(list_ziffern):
     print(zeile_3)
     print()
 
-
+# TODO Finde die bugs die du eigentlich schon kennst aber du huso hast deine Festplatte formatiert Spasst!
 def rek(aktuelle_ziffer_index=0):
     global versuchsliste, aktionen_übrig, offers, requests, ziffern
     print("\r", '_' * (aktuelle_ziffer_index + 1), aktionen_übrig, end="")
@@ -157,10 +157,9 @@ def rek(aktuelle_ziffer_index=0):
                         log2.append((offers, o))
                         log.append((aktuelle_ziffer.bekommt_von, anbietende_ziffer_id))
                     else:
-                        offers.append(aktuelle_ziffer_index)
-                        log.append((offers, aktuelle_ziffer_index))
+                        requests.append(aktuelle_ziffer_index)
+                        log.append((requests, aktuelle_ziffer_index))
             aktionen_übrig -= max((wegnehmen, hinzufügen))
-
             if rek(aktuelle_ziffer_index + 1): return True
             yarak = letzte_verteilung(aktuelle_ziffer_index)
             # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
