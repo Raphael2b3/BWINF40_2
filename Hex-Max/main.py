@@ -50,7 +50,7 @@ class Ziffer:
         self.char = char
 
     def aktionen_zum_ziel(self, ziel_char):
-        self.char = ziel_char
+        self.char = ziel_char  # setzt den char wert zum ziel
         model = Ziffer.models[ziel_char]
         wegnehmen = 0
         hinzulegen = 0
@@ -86,9 +86,9 @@ class Ziffer:
         self.char = char_
         return erfolg, rekord
 
-
     def __str__(self):
         return self.char
+
 
 def get_input():
     pfad = "hexmax0.txt"
@@ -121,55 +121,66 @@ def print_ziffern(list_ziffern):
     print(zeile_3)
     print()
 
+
 # TODO Finde die bugs die du eigentlich schon kennst aber du huso hast deine Festplatte formatiert Spasst!
 def rek(aktuelle_ziffer_index=0):
     global versuchsliste, aktionen_übrig, offers, requests, ziffern
-    print("\r", '_' * (aktuelle_ziffer_index + 1), aktionen_übrig, end="")
     if aktuelle_ziffer_index >= len(ziffern):
-        if 0 == len(offers) == len(requests):
-            return True
+        return 0 == len(offers) == len(requests)
     else:
-        aktuelle_ziffer = ziffern[aktuelle_ziffer_index]
-        for char in versuchsliste:
-            wegnehmen, hinzufügen = aktuelle_ziffer.aktionen_zum_ziel(char)
-            if max((wegnehmen,
-                    hinzufügen)) > aktionen_übrig:  # wenn nicht genug aktionen_übrig übrig sind um diese ziffer zu ändern
+        aktuelle_ziffer = ziffern[aktuelle_ziffer_index]  # betrachtete aktuelle Ziffer
+        for char in versuchsliste:  # iteriert durch alle Hex-Zahlen durch
+            wegnehmen, hinzufügen = aktuelle_ziffer.aktionen_zum_ziel(
+                char)  # welche Aktionen zum erreichen der Zielziffer "char" benötigt wird
+            max_aktions = max((wegnehmen, hinzufügen))
+            if max_aktions > aktionen_übrig:  # wenn nicht genug aktionen_übrig übrig sind um diese Ziffer zu ändern
                 continue
+
             log = []  # log = [(list, objekt)] later remove objekt from list
             log2 = []  # log2 = [(list, objekt)] later append objekt to list
-            if wegnehmen > hinzufügen:
-                for _ in range(wegnehmen - hinzufügen):
-                    if len(requests) > 0:
+
+            aktionen = min((wegnehmen, hinzufügen))  # es müssen mindetens die unter einander zu tauschenden sticks
+            # Aktioniert werden
+            if wegnehmen > hinzufügen:  # es sind zu viele Sticks im Ziffersystem
+                for _ in range(wegnehmen - hinzufügen):  # für jedes zu viele Stick
+                    if len(requests) > 0:  # es gibt mangel in anderen Ziffersystemen
+                        # weist den überschüssigen Stick zu einer Ziffer mit einem Stickmangel zu
                         annehmende_ziffer = ziffern[requests[0]]
                         annehmende_ziffer.bekommt_von.append(aktuelle_ziffer_index)
                         o = requests.pop(0)
+                        # Makierungen werden in ein Logbuch geschrieben
                         log2.append((requests, o))
                         log.append((annehmende_ziffer.bekommt_von, aktuelle_ziffer_index))
-                    else:
-                        offers.append(aktuelle_ziffer_index)
-                        log.append((offers, aktuelle_ziffer_index))
-            elif hinzufügen > wegnehmen:
-                for _ in range(hinzufügen - wegnehmen):
-                    if len(offers) > 0:  # wenn es angebote gibt
+                    else:  # es gibt keine Annehmende Ziffern
+                        offers.append(aktuelle_ziffer_index)  # Ziffer bietet seinen Stick an
+                        log.append((offers, aktuelle_ziffer_index))  # logbuch
+                        aktionen += 1
+            elif hinzufügen > wegnehmen:  # es sind zu wenige Sicks im Ziffernsystem
+                for _ in range(hinzufügen - wegnehmen):  # für jeden fehlenden Stick
+                    if len(offers) > 0:  # es gibt Angebote
+                        # Speichert von welcher Ziffer diese Ziffer den fehlenden Stick erhält
                         anbietende_ziffer_id = offers[0]
                         aktuelle_ziffer.bekommt_von.append(anbietende_ziffer_id)
                         o = offers.pop(0)
+                        # aktionen ins Loguch schreiben
                         log2.append((offers, o))
                         log.append((aktuelle_ziffer.bekommt_von, anbietende_ziffer_id))
-                    else:
+                    else:  # es gibt keine Angebote
+                        # meldet einen Request
                         requests.append(aktuelle_ziffer_index)
-                        log.append((requests, aktuelle_ziffer_index))
-            aktionen_übrig -= max((wegnehmen, hinzufügen))
-            if rek(aktuelle_ziffer_index + 1): return True
-            yarak = letzte_verteilung(aktuelle_ziffer_index)
+                        log.append((requests, aktuelle_ziffer_index))  # logbuch
+                        aktionen += 1
+            aktionen_übrig -= aktionen
+
+            if letzte_verteilung(aktuelle_ziffer_index):  # wenn die jetzige ziffer funktionieren kann
+                if rek(aktuelle_ziffer_index + 1): return True
             # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
-            if yarak: return True
-            aktionen_übrig += max((wegnehmen, hinzufügen))
+
+            aktionen_übrig += aktionen
             for a, b in log:
                 a.remove(b)
             for a, b in log2:
                 a.append(b)
-
     return False
 
 
@@ -232,7 +243,6 @@ def letzte_verteilung(index):
        return perm_success
    """
 
-
     global ziffern, aktionen_übrig
     a = max(len(offers), len(requests))
     m = 1 if len(offers) == 0 else -1  # Multiplikator, 1 wenn noch stäbchen in ziffern systemen fehlen,
@@ -245,9 +255,9 @@ def rek2(zielausgleich, m, index, blocked):
     for a in range(zielausgleich, 0, -1):
         best_i = 0
         rekord_aktion = float("inf")
-        for i in range(index+1, len(ziffern)):
+        for i in range(index + 1, len(ziffern)):
             if i in blocked: continue
-            erfolg, min_aktion = ziffern[i].min_umformung_mit_n_stäbchen(a*m)
+            erfolg, min_aktion = ziffern[i].min_umformung_mit_n_stäbchen(a * m)
             if not erfolg: continue
             if min_aktion > aktionen_übrig or rekord_aktion <= min_aktion: continue
             best_i = i
@@ -255,19 +265,25 @@ def rek2(zielausgleich, m, index, blocked):
         if rekord_aktion == float("inf"): continue
         blocked.append(best_i)
         aktionen_übrig -= rekord_aktion
-        if rek2(zielausgleich-a, m, index, blocked): return True
+        if rek2(zielausgleich - a, m, index, blocked): return True
         blocked.remove(best_i)
         aktionen_übrig += rekord_aktion
     return False
 
+
 timer_start()
 if __name__ == '__main__':
-
-    ziffern, aktionen_übrig = get_input()
+    """
+    Definitionen: 
+    - Ziffer: Eine Instanz der Klasse Ziffer, enthält Informationen über ob die "Sticks" an einer Position sind
+    - Ziffersystem: Meint die möglichen Postionen in einer Ziffer
+    
+    """
+    ziffern, aktionen_übrig = get_input()  # input aus Text-Datei
     offers = []  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
     requests = []  # liste von ziffer_ids dessen ziffer striche Anfragen
-    versuchsliste = "FEDCBA987654321"
-    rek()
+    versuchsliste = "FEDCBA987654321"  # Hex-Zahlen zum durch iterieren
+    rek()  # haupt funktion
 
     # print_ziffern(ziffern)
     print("Result")
