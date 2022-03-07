@@ -50,6 +50,12 @@ class Ziffer:
         self.char = char
 
     def aktionen_zum_ziel(self, ziel_char):
+        """
+        Gibt informationen wie viele Sticks falsch an ihren Platz sind und unterteilt das in
+        Falsch weil stick Fehlt und Falsch weil Stick nicht da sein dürfte
+        :param ziel_char:
+        :return:
+        """
         self.char = ziel_char  # setzt den char wert zum ziel
         model = Ziffer.models[ziel_char]
         wegnehmen = 0
@@ -82,7 +88,6 @@ class Ziffer:
             rekord = min((wegnehmen, hinzulegen))
             #  min weil die übrigen aktionen von außen übernommen werden
             char_ = char
-
         self.char = char_
         return erfolg, rekord
 
@@ -91,7 +96,7 @@ class Ziffer:
 
 
 def get_input():
-    pfad = "hexmax0.txt"
+    pfad = "hexmax5.txt"
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     zeilen.pop(-1)
@@ -125,16 +130,15 @@ def print_ziffern(list_ziffern):
 # TODO Finde die bugs die du eigentlich schon kennst aber du huso hast deine Festplatte formatiert Spasst!
 def rek(aktuelle_ziffer_index=0):
     global versuchsliste, aktionen_übrig, offers, requests, ziffern
-    if aktuelle_ziffer_index >= len(ziffern):
+    if aktionen_übrig < 0:
+        input("Errrorr")
+    if aktuelle_ziffer_index >= len(ziffern) or aktionen_übrig == 0:
         return 0 == len(offers) == len(requests)
     else:
         aktuelle_ziffer = ziffern[aktuelle_ziffer_index]  # betrachtete aktuelle Ziffer
         for char in versuchsliste:  # iteriert durch alle Hex-Zahlen durch
             wegnehmen, hinzufügen = aktuelle_ziffer.aktionen_zum_ziel(
                 char)  # welche Aktionen zum erreichen der Zielziffer "char" benötigt wird
-            max_aktions = max((wegnehmen, hinzufügen))
-            if max_aktions > aktionen_übrig:  # wenn nicht genug aktionen_übrig übrig sind um diese Ziffer zu ändern
-                continue
 
             log = []  # log = [(list, objekt)] later remove objekt from list
             log2 = []  # log2 = [(list, objekt)] later append objekt to list
@@ -171,10 +175,10 @@ def rek(aktuelle_ziffer_index=0):
                         log.append((requests, aktuelle_ziffer_index))  # logbuch
                         aktionen += 1
             aktionen_übrig -= aktionen
-
-            if letzte_verteilung(aktuelle_ziffer_index):  # wenn die jetzige ziffer funktionieren kann
-                if rek(aktuelle_ziffer_index + 1): return True
-            # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
+            if aktionen_übrig >= 0:
+                if letzte_verteilung(aktuelle_ziffer_index):  # wenn die jetzige ziffer funktionieren kann
+                    if rek(aktuelle_ziffer_index + 1): return True
+                # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
 
             aktionen_übrig += aktionen
             for a, b in log:
@@ -251,8 +255,8 @@ def letzte_verteilung(index):
 
 def rek2(zielausgleich, m, index, blocked):
     global aktionen_übrig, ziffern
-    if zielausgleich == 0: return True
-    for a in range(zielausgleich, 0, -1):
+    if zielausgleich == 0: return True  # Erfolg wenn nichts mehr auszugleichen ist
+    for a in range(5 if zielausgleich > 5 else zielausgleich, 0, -1):
         best_i = 0
         rekord_aktion = float("inf")
         for i in range(index + 1, len(ziffern)):
