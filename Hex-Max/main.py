@@ -43,10 +43,12 @@ class Ziffer:
         'F': [True, True, False, True, False, True, False]
     }
 
-    def __init__(self, char):
+    def __init__(self, char, _id):
+        self.id = _id
         self.positions = Ziffer.models[char][:]  # kopiere die Instanz sodass keine Referenz mehr entsteht
         self.probieren_index = 0
         self.bekommt_von = []
+        self.useless_indeces = None
         self.char = char
 
     def aktionen_zum_ziel(self, ziel_char):
@@ -60,14 +62,38 @@ class Ziffer:
         model = Ziffer.models[ziel_char]
         wegnehmen = 0
         hinzulegen = 0
-
+        self.useless_indeces = []
         for i in range(7):
             if not model[i] == self.positions[i]:
                 if model[i]:
                     hinzulegen += 1
                 else:
                     wegnehmen += 1
+                    self.useless_indeces.append(i)  # sticks müssen von Pos weggenommen werden
         return wegnehmen, hinzulegen
+
+    def aktionen_log_zum_ziel(self):
+        model = Ziffer.models[self.char]
+        wegnehmen = 0
+        hinzulegen = 0
+        leerepositionen = []
+
+        for i in range(7):
+            if not model[i] == self.positions[i]:
+                if model[i]:
+                    hinzulegen += 1
+                    leerepositionen.append(i)
+                else:
+                    wegnehmen += 1
+
+        t_logs = []
+        sources = [self.id for _ in range(wegnehmen)] + self.bekommt_von
+
+        for p in leerepositionen:
+            gebenden_ziffer_id = sources.pop(-1)
+            log = self.id, p, gebenden_ziffer_id, ziffern[gebenden_ziffer_id].useless_indeces.pop(-1)
+            t_logs.append(log)
+        return t_logs
 
     def min_umformung_mit_n_stäbchen(self, n_requested):  #
         """
@@ -89,24 +115,12 @@ class Ziffer:
             #  min weil die übrigen aktionen von außen übernommen werden
             char_ = char
         self.char = char_
+        self.aktionen_zum_ziel(char_)
         return erfolg, rekord
 
-    def change_to(self, char):
-        wegnehmen, hinzulegen = self.aktionen_zum_ziel(char)
-
-        if wegnehmen > hinzulegen:  # zu viele Sticks im System
-            model = Ziffer.models[char]
-
-            for i in range(7):
-                if not model[i] == self.positions[i]:
-                    if model[i]:
-                        hinzulegen += 1
-                    else:
-                        wegnehmen += 1
-
-        return
     def index_fehlend(self):
         pass
+
     def __str__(self):
         return self.char
 
@@ -119,13 +133,16 @@ def get_input():
 
     ziffern = []  # sammelt alle Ziffern
     print(zeilen[0])
+    i = 0
     for char in zeilen[0]:
-        ziffern.append(Ziffer(char))
+        ziffern.append(Ziffer(char, i))
+        i += 1
     aktionen = int(zeilen[1])
     print("Aktionen", aktionen)
     return ziffern, aktionen
 
 
+#
 def print_ziffern(list_ziffern):
     zeile_1 = ""
     zeile_2 = ""
@@ -189,12 +206,14 @@ def rek(aktuelle_ziffer_index=0):
                         aktionen += 1
             aktionen_übrig -= aktionen
             if aktionen_übrig >= 0:
-                  # wenn die jetzige ziffer funktionieren kann
+                # wenn die jetzige ziffer funktionieren kann
                 if rek(aktuelle_ziffer_index + 1): return True
-                yarak = letzte_verteilung(aktuelle_ziffer_index)
-                if yarak: return True
+                # nun wird überprüft ob ein ausgleich noch möglich ist der übrigen stäbchen möglich ist
+                ausgleich_möglich = ausgleich_der_stäbchen(aktuelle_ziffer_index)
+                if ausgleich_möglich: return True
                 # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
 
+            # aktionen Rückgängig machen
             aktionen_übrig += aktionen
             for a, b in log:
                 a.remove(b)
@@ -214,11 +233,14 @@ def permute(l, n, out, top):
     return out
 
 
-def letzte_verteilung(index):
+def ausgleich_der_stäbchen(index): # TODO Zusatz von siehe unten machen bitee
     """
     Diese Funktion löst dieses Problem:\n
     Mit einer Anzahl N an übrigen Aktionen und einer menge von {index+1,...,len(ziffern)} Ziffern muss der Mangel/Überschuss\n
     an Stäbchen ausgeglichen werden:\n
+    __________
+    Zusatz:\n
+    Der ausgleich muss dabei eine sogroße hexademzimalzahl generieren wie es nur geht
     Bsp Situationen:\n
     4 stäbchen müssen noch auf 3 ziffern verteilt werden\n
     4 stäbchen müssen noch von 3 ziffern weggenommen werden\n
@@ -227,9 +249,8 @@ def letzte_verteilung(index):
     :param index: index der letzten festgelegten ziffer
     :return:
     """
-
-    global ziffern, aktionen_übrig
-    a = max(len(offers), len(requests))
+    global ziffern, offers, requests
+    a = len(offers)+len(requests)  # eines der beiden wird immer len = 0 sein
     m = 1 if len(offers) == 0 else -1  # Multiplikator, 1 wenn noch stäbchen in ziffern systemen fehlen,
     return rek2(a, m, index, [])
 
@@ -238,6 +259,10 @@ def rek2(zielausgleich, m, index, blocked):
     global aktionen_übrig, ziffern
     if zielausgleich == 0: return True  # Erfolg wenn nichts mehr auszugleichen ist
     for a in range(5 if zielausgleich > 5 else zielausgleich, 0, -1):
+        # maximum das pro ziffer eingefügt oder weggenommen werden kann ist 5 und das minimum ist 1 da es
+        # sonst keinen unterschied macht
+
+        # wir finden die ziffer die am wenigsten zusätzliche aktionen braucht
         best_i = 0
         rekord_aktion = float("inf")
         for i in range(index + 1, len(ziffern)):
@@ -256,7 +281,6 @@ def rek2(zielausgleich, m, index, blocked):
     return False
 
 
-
 timer_start()
 if __name__ == '__main__':
     """
@@ -264,6 +288,11 @@ if __name__ == '__main__':
     - Ziffer: Eine Instanz der Klasse Ziffer, enthält Informationen über ob die "Sticks" an einer Position sind
     - Ziffersystem: Meint die möglichen Postionen in einer Ziffer
     
+    FFFC438B55
+    FFFC997B95
+     _   _   _   _   _   _   _       _   _  
+    |_  |_  |_  |   |_| |_|   | |_  |_| |_  
+    |   |   |   |_   _|  _|   | |_|  _|  _| 
     """
     ziffern, aktionen_übrig = get_input()  # input aus Text-Datei
     t_akt = aktionen_übrig
@@ -273,14 +302,28 @@ if __name__ == '__main__':
     rek()  # haupt funktion
     ziffern[0].aktionen_zum_ziel(ziffern[0].char)
 
-
     #  TODO erfülle die Darstellung der Schritte um zum Ziel zu kommen
     # print_ziffern(ziffern)
     print("Result")
     for ziff in ziffern:
         print(ziff.char, end="")
     print()
+    print_ziffern(ziffern)
+    for az in ziffern:
+        logs = az.aktionen_log_zum_ziel()
 
+        for log in logs:
+            """
+            az_id: Id der stick-annehmenden Ziffer
+            az_sp: Stickposition im Ziffernsystem der stick-annehmenden Ziffer
+            gz_id: Id der stick-abgebenden Ziffer
+            gz_sp: Stickposition im Ziffernsystem der stick-abgebenden Ziffer
+            """
+            az_id, az_sp, gz_id, gz_sp = log
+            # tauscht sticks zwischen den beiden
+            ziffern[az_id].positions[az_sp], ziffern[gz_id].positions[gz_sp] = ziffern[gz_id].positions[gz_sp], \
+                                                                               ziffern[az_id].positions[az_sp]
+            print_ziffern(ziffern)
 timer_stop()
 
 """
