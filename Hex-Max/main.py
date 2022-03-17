@@ -56,7 +56,7 @@ class Ziffer:
         Gibt informationen wie viele Sticks falsch an ihren Platz sind und unterteilt das in
         Falsch weil stick Fehlt und Falsch weil Stick nicht da sein dürfte
         :param ziel_char:
-        :return:
+        :return: wegnehmen, hinzufügen (für übergebenen char)
         """
         self.char = ziel_char  # setzt den char wert zum ziel
         model = Ziffer.models[ziel_char]
@@ -126,7 +126,7 @@ class Ziffer:
 
 
 def get_input():
-    pfad = "hexmax1.txt"
+    pfad = "hexmax2.txt"
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     zeilen.pop(-1)
@@ -162,10 +162,11 @@ def print_ziffern(list_ziffern):
 
 def rek(aktuelle_ziffer_index=0):
     global versuchsliste, aktionen_übrig, offers, requests, ziffern
-    if aktuelle_ziffer_index >= len(ziffern) or aktionen_übrig == 0:
+    if aktuelle_ziffer_index == len(ziffern) or aktionen_übrig == 0:
         return 0 == len(offers) == len(requests)
     else:
         aktuelle_ziffer = ziffern[aktuelle_ziffer_index]  # betrachtete aktuelle Ziffer
+        ursprungschar = aktuelle_ziffer.char
         for char in versuchsliste:  # iteriert durch alle Hex-Zahlen durch
             wegnehmen, hinzufügen = aktuelle_ziffer.aktionen_zum_ziel(
                 char)  # welche Aktionen zum erreichen der Zielziffer "char" benötigt wird
@@ -209,59 +210,83 @@ def rek(aktuelle_ziffer_index=0):
                 # wenn die jetzige ziffer funktionieren kann
                 if rek(aktuelle_ziffer_index + 1): return True
                 # nun wird überprüft ob ein ausgleich noch möglich ist der übrigen stäbchen möglich ist
-                ausgleich_möglich = ausgleich_der_stäbchen(aktuelle_ziffer_index)
+                ausgleich_möglich = ausgleich_der_stäbchen(aktuelle_ziffer_index+1)
                 if ausgleich_möglich: return True
                 # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
 
             # aktionen Rückgängig machen
             aktionen_übrig += aktionen
-            for a, b in log:
-                a.remove(b)
-            for a, b in log2:
-                a.append(b)
+            for a, b in log: a.remove(b)
+            for a, b in log2: a.append(b)
+            aktuelle_ziffer.char = ursprungschar
     return False
 
 
-def permute(l, n, out, top):
-    if n == 0:
-        out.append(l[:])
-    else:
-        for i in range(min(n, top), 0, -1):
-            l.append(i)
-            permute(l, n - i, out, i)
-            l.remove(i)
-    return out
 
-
-def ausgleich_der_stäbchen(index): # TODO Zusatz von siehe unten machen bitee
+def ausgleich_der_stäbchen(index):
     """
     Diese Funktion löst dieses Problem:\n
     Mit einer Anzahl N an übrigen Aktionen und einer menge von {index+1,...,len(ziffern)} Ziffern muss der Mangel/Überschuss\n
     an Stäbchen ausgeglichen werden:\n
     __________
     Zusatz:\n
-    Der ausgleich muss dabei eine sogroße hexademzimalzahl generieren wie es nur geht
+    Der ausgleich muss dabei eine so große hexademzimalzahl generieren wie es nur geht
     Bsp Situationen:\n
     4 stäbchen müssen noch auf 3 ziffern verteilt werden\n
     4 stäbchen müssen noch von 3 ziffern weggenommen werden\n
 
-
     :param index: index der letzten festgelegten ziffer
-    :return:
+    :return: Erfolg (bool)
+    FFFEA97111
+    FFFEA97F55
     """
-    global ziffern, offers, requests
-    a = len(offers)+len(requests)  # eines der beiden wird immer len = 0 sein
-    m = 1 if len(offers) == 0 else -1  # Multiplikator, 1 wenn noch stäbchen in ziffern systemen fehlen,
-    return rek2(a, m, index, [])
-
-
-def rek2(zielausgleich, m, index, blocked):
     global aktionen_übrig, ziffern
+    zielausgleich = len(offers) + len(requests)
     if zielausgleich == 0: return True  # Erfolg wenn nichts mehr auszugleichen ist
-    for a in range(5 if zielausgleich > 5 else zielausgleich, 0, -1):
+    if index == len(ziffern): return False
+    aktuelleziffer = ziffern[index]
+    ursprungschar = aktuelleziffer.char
+    for char in versuchsliste:
+        weg, hin = aktuelleziffer.aktionen_zum_ziel(char)
+        additional_akt = min(hin, weg)
+        if aktionen_übrig - additional_akt < 0: continue
+        ap = []
+        re = []
+        g = weg - hin  # anzahl an sticks die beiseite gelegt werden
+        bug_akt = 0
+        for _ in range(abs(g)):
+            if g < 0: # es wird aus offers genommen
+                if len(offers) > 0:
+                    o = offers.pop(-1)
+                    aktuelleziffer.bekommt_von.append(o)
+                    ap.append((offers, o))  # 0.append(1)
+                    re.append((aktuelleziffer.bekommt_von, o))  # 0.remove(1)
+                else:
+                    requests.append(index)
+                    re.append((requests, index))  # 0.remove(1)
+                    bug_akt +=1
+            elif g > 0: # es wird aus requests genommen
+                if len(requests) > 0:
+                    o = requests.pop(-1)
+                    ziffern[o].bekommt_von.append(o)
+                    ap.append((requests, o))  # 0.append(1)
+                    re.append((ziffern[o].bekommt_von, o))  # 0.remove(1)
+                else:
+                    offers.append(index)
+                    re.append((offers, index))  # 0.remove(1)
+                    bug_akt += 1
+        aktionen_übrig -= additional_akt+bug_akt
+        if aktionen_übrig>=0:
+            if ausgleich_der_stäbchen(index + 1): return True
+        aktionen_übrig += additional_akt+bug_akt
+
+        for l, o in ap: l.append(o)
+        for l, o in re: l.remove(o)
+        aktuelleziffer.char = ursprungschar
+
+    """for a in range(5 if zielausgleich > 5 else zielausgleich, 0, -1):
         # maximum das pro ziffer eingefügt oder weggenommen werden kann ist 5 und das minimum ist 1 da es
         # sonst keinen unterschied macht
-
         # wir finden die ziffer die am wenigsten zusätzliche aktionen braucht
         best_i = 0
         rekord_aktion = float("inf")
@@ -278,6 +303,7 @@ def rek2(zielausgleich, m, index, blocked):
         if rek2(zielausgleich - a, m, index, blocked): return True
         blocked.remove(best_i)
         aktionen_übrig += rekord_aktion
+    """
     return False
 
 
@@ -299,15 +325,12 @@ if __name__ == '__main__':
     offers = []  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
     requests = []  # liste von ziffer_ids dessen ziffer striche Anfragen
     versuchsliste = "FEDCBA987654321"  # Hex-Zahlen zum durch iterieren
-    rek()  # haupt funktion
-    ziffern[0].aktionen_zum_ziel(ziffern[0].char)
 
-    #  TODO erfülle die Darstellung der Schritte um zum Ziel zu kommen
-    # print_ziffern(ziffern)
+    rek()  # haupt funktion
     print("Result")
     for ziff in ziffern:
         print(ziff.char, end="")
-    print()
+    print("Start:")
     print_ziffern(ziffern)
     for az in ziffern:
         logs = az.aktionen_log_zum_ziel()
@@ -324,6 +347,8 @@ if __name__ == '__main__':
             ziffern[az_id].positions[az_sp], ziffern[gz_id].positions[gz_sp] = ziffern[gz_id].positions[gz_sp], \
                                                                                ziffern[az_id].positions[az_sp]
             print_ziffern(ziffern)
+            print("Aktionen übrig", aktionen_übrig)
+            aktionen_übrig-=1
 timer_stop()
 
 """
