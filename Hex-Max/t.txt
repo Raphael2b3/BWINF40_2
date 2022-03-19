@@ -1,2 +1,35 @@
 661
 4
+
+
+FFFEA97B55
+# Aktioniert werden
+            if wegnehmen > hinzufügen:  # es sind zu viele Sticks im Ziffersystem
+                for _ in range(wegnehmen - hinzufügen):  # für jedes zu viele Stick
+                    if len(requests) > 0:  # es gibt mangel in anderen Ziffersystemen
+                        # weist den überschüssigen Stick zu einer Ziffer mit einem Stickmangel zu
+                        annehmende_ziffer = ziffern[requests[0]]
+                        annehmende_ziffer.bekommt_von.append(aktuelle_ziffer_index)
+                        o = requests.pop(0)
+                        # Makierungen werden in ein Logbuch geschrieben
+                        log2.append((requests, o))
+                        log.append((annehmende_ziffer.bekommt_von, aktuelle_ziffer_index))
+                    else:  # es gibt keine Annehmende Ziffern
+                        offers.append(aktuelle_ziffer_index)  # Ziffer bietet seinen Stick an
+                        log.append((offers, aktuelle_ziffer_index))  # logbuch
+                        aktionen += 1
+            elif hinzufügen > wegnehmen:  # es sind zu wenige Sicks im Ziffernsystem
+                for _ in range(hinzufügen - wegnehmen):  # für jeden fehlenden Stick
+                    if len(offers) > 0:  # es gibt Angebote
+                        # Speichert von welcher Ziffer diese Ziffer den fehlenden Stick erhält
+                        anbietende_ziffer_id = offers[0]
+                        aktuelle_ziffer.bekommt_von.append(anbietende_ziffer_id)
+                        o = offers.pop(0)
+                        # aktionen ins Loguch schreiben
+                        log2.append((offers, o))
+                        log.append((aktuelle_ziffer.bekommt_von, anbietende_ziffer_id))
+                    else:  # es gibt keine Angebote
+                        # meldet einen Request
+                        requests.append(aktuelle_ziffer_index)
+                        log.append((requests, aktuelle_ziffer_index))  # logbuch
+                        aktionen += 1
