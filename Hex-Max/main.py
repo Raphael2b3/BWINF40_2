@@ -16,6 +16,7 @@ def timer_stop():
 
 # endregion
 
+# region Finished
 class Ziffer:
     """
         Eine Ziffer hat 7 positionen mit die mit stichen belegt werden können
@@ -105,12 +106,11 @@ class Ziffer:
         return self.char
 
 
-def get_input():
-    pfad = "hexmax1.txt"
+def get_input(pfad):
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     zeilen.pop(-1)
-
+    #
     ziffern = []  # sammelt alle Ziffern
     print(zeilen[0])
     i = 0
@@ -139,36 +139,7 @@ def print_ziffern(list_ziffern):  # printet die momentane Anordnung der Sticks
     print()
 
 
-def maximiere_ziffern(aktuelle_ziffer_index=0):
-    global versuchsliste, aktionen_übrig, offers, requests, ziffern
-    if aktuelle_ziffer_index == len(ziffern) or aktionen_übrig == 0:
-        return 0 == len(offers) == len(requests)
-    else:
-        aktuelle_ziffer = ziffern[aktuelle_ziffer_index]  # betrachtete aktuelle Ziffer
-
-        for char in versuchsliste:  # iteriert durch alle Hex-Zahlen durch
-
-            aktionen, removes, appends = aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index, aktuelle_ziffer)
-
-            aktionen_übrig -= aktionen
-            if aktionen_übrig >= 0:
-                # wenn die jetzige ziffer funktionieren kann
-                if maximiere_ziffern(aktuelle_ziffer_index + 1): return True
-                # nun wird überprüft ob ein ausgleich noch möglich ist der übrigen stäbchen möglich ist
-                if ausgleich_der_stäbchen(aktuelle_ziffer_index + 1): return True
-                # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
-
-            # aktionen Rückgängig machen
-            aktionen_übrig += aktionen
-            for a, b in removes: a.remove(b)
-            for a, b in appends: a.append(b)
-        aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
-    return False
-    # FFFEA97B55
-
-
 def aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index, aktuelle_ziffer):
-
     """
     Findet heraus wie viele aktionen wirklich getan werden müssen und berücksichtigt dabei schon beiseite gelegte sticks
     :param wegnehmen:
@@ -209,6 +180,60 @@ def aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index, aktuelle_ziffer)
     return aktionen, removes, appends
 
 
+def ausgabe():
+    print("Ergebnis:\nEnd-Hexadezimalzahl")
+    for ziff in ziffern:
+        print(ziff.char, end="")
+    print("\nAusgangssituation:")
+    print_ziffern(ziffern)
+    a = 1
+    for az in ziffern:
+        logs = az.aktionen_log_zum_ziel()
+
+        for log in logs:
+            """
+            az_id: Id der stick-annehmenden Ziffer
+            az_sp: Stickposition im Ziffernsystem der stick-annehmenden Ziffer
+            gz_id: Id der stick-abgebenden Ziffer
+            gz_sp: Stickposition im Ziffernsystem der stick-abgebenden Ziffer
+            """
+            az_id, az_sp, gz_id, gz_sp = log
+            # tauscht sticks zwischen den beiden
+            ziffern[az_id].positions[az_sp], ziffern[gz_id].positions[gz_sp] = ziffern[gz_id].positions[gz_sp], \
+                                                                               ziffern[az_id].positions[az_sp]
+            print_ziffern(ziffern)
+            print("Das war Aktion", a)
+            a += 1
+
+
+def maximiere_ziffern(aktuelle_ziffer_index=0):
+    global versuchsliste, aktionen_übrig, offers, requests, ziffern
+    if aktuelle_ziffer_index == len(ziffern) or aktionen_übrig == 0:
+        return 0 == len(offers) == len(requests)
+    else:
+        aktuelle_ziffer = ziffern[aktuelle_ziffer_index]  # betrachtete aktuelle Ziffer
+
+        for char in versuchsliste:  # iteriert durch alle Hex-Zahlen durch
+
+            aktionen, removes, appends = aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index, aktuelle_ziffer)
+
+            aktionen_übrig -= aktionen
+            if aktionen_übrig >= 0:
+                # wenn die jetzige ziffer funktionieren kann
+                if maximiere_ziffern(aktuelle_ziffer_index + 1): return True
+                # nun wird überprüft ob ein ausgleich noch möglich ist der übrigen stäbchen möglich ist
+                if ausgleich_der_stäbchen(aktuelle_ziffer_index + 1, aktionen_übrig, ziffern): return True
+                # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
+
+            # aktionen Rückgängig machen
+            aktionen_übrig += aktionen
+            for a, b in removes: a.remove(b)
+            for a, b in appends: a.append(b)
+        aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
+    return False
+    # FFFEA97B55
+
+
 def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, ziffern):
     aktuelle_ziffer_index = 0
     char_i = [0 for _ in range(len(ziffern))]
@@ -219,6 +244,7 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
         if aktuelle_ziffer_index == len(ziffern):
             if 0 == len(offers) == len(requests): break
             aktuelle_ziffer_index -= 1
+            continue
 
         aktuelle_ziffer = ziffern[aktuelle_ziffer_index]  # betrachtete aktuelle Ziffer
         if not aktiv[aktuelle_ziffer_index]:
@@ -245,9 +271,14 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
             if aktionen_übrig >= 0:
                 aktuelle_ziffer_index += 1
         else:
+            print("restr")
             # nun wird überprüft, ob ein Ausgleich noch möglich ist der übrigen stäbchen möglich ist
-            ausgleich_möglich = ausgleich_der_stäbchen_iter(aktuelle_ziffer_index + 1, aktionen_übrig, ziffern)
-            if ausgleich_möglich: break
+            ausgleich_möglich = ausgleich_der_stäbchen_iter(aktuelle_ziffer_index + 1, aktionen_übrig,
+                                                            ziffern) if True else ausgleich_der_stäbchen(
+                aktuelle_ziffer_index + 1, aktionen_übrig, ziffern)
+            if ausgleich_möglich:
+                print("sas")
+                break
             # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
 
             aktionen, removes, appends = logs[aktuelle_ziffer_index]
@@ -261,6 +292,8 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
 
     return True
 
+
+# endregion
 
 def ausgleich_der_stäbchen(index, aktionen_übrig, ziffern):
     """
@@ -299,15 +332,17 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):
     char_i = [0 for _ in range(len(ziffern))]
     logs: list[tuple[int, list, list]] = [None for _ in range(len(ziffern))]
     aktiv = [False for _ in range(len(ziffern))]
-    start_index=index
+    start_index = index
     while start_index <= index:
         zielausgleich = len(offers) + len(requests)
-        if zielausgleich == 0: return True
-        if index == len(ziffern): index -= 1
+        if index == len(ziffern):
+            if zielausgleich == 0: return True
+            index -= 1
+            continue
 
-        aktuelle_ziffer = ziffern[index]  # betrachtete aktuelle Ziffer
         if not aktiv[index]:
-
+            if zielausgleich == 0: return True
+            aktuelle_ziffer = ziffern[index]  # betrachtete aktuelle Ziffer
             ci = char_i[index]
             if ci == len(versuchsliste):
                 char_i[index] = 0
@@ -334,35 +369,11 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):
             char_i[index] += 1
     return False
 
-
-def ausgabe():
-    print("Ergebnis:\nEnd-Hexadezimalzahl")
-    for ziff in ziffern:
-        print(ziff.char, end="")
-    print("\nAusgangssituation:")
-    print_ziffern(ziffern)
-    a = 1
-    for az in ziffern:
-        logs = az.aktionen_log_zum_ziel()
-
-        for log in logs:
-            """
-            az_id: Id der stick-annehmenden Ziffer
-            az_sp: Stickposition im Ziffernsystem der stick-annehmenden Ziffer
-            gz_id: Id der stick-abgebenden Ziffer
-            gz_sp: Stickposition im Ziffernsystem der stick-abgebenden Ziffer
-            """
-            az_id, az_sp, gz_id, gz_sp = log
-            # tauscht sticks zwischen den beiden
-            ziffern[az_id].positions[az_sp], ziffern[gz_id].positions[gz_sp] = ziffern[gz_id].positions[gz_sp], \
-                                                                               ziffern[az_id].positions[az_sp]
-            print_ziffern(ziffern)
-            print("Das war Aktion", a)
-            a += 1
-
-
+#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFAA98BB8B9DFAFEAE888DD888AD8BA8EA8888
+#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFAA98BB8B9DFAFEAE888DD888AD8BA8EA8888
 timer_start()
-
+pfad = "hexmax4.txt"
+iterativ = True
 if __name__ == '__main__':
     """
     Definitionen: 
@@ -375,17 +386,15 @@ if __name__ == '__main__':
     |_  |_  |_  |   |_| |_|   | |_  |_| |_  
     |   |   |   |_   _|  _|   | |_|  _|  _| 
     """
-    ziffern, aktionen_übrig = get_input()  # input aus Text-Datei
+    ziffern, aktionen_übrig = get_input(pfad)  # input aus Text-Datei
     offers = []  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
     requests = []  # liste von ziffer_ids dessen ziffer striche Anfragen
-    versuchsliste = "FEDCBA987654321"  # Hex-Zahlen zum durch iterieren
-    # maximiere_ziffern()
-    maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests,
-                           ziffern)  # haupt funktion
-    # FFFEA97B55
-    # FFFEA97B55
-    # FFFFFFFE88
-    # 0000000177
+    versuchsliste = "FEDCBA9876543210"  # Hex-Zahlen zum durch iterieren
+    if not iterativ:
+        maximiere_ziffern()
+    else:
+        maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, ziffern)  # haupt funktion
+
     ausgabe()
 
 timer_stop()
