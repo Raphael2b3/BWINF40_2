@@ -170,9 +170,9 @@ def aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index, aktuelle_ziffer)
         elif g > 0:  # es wird aus requests genommen
             if len(requests) > 0:
                 o = requests.pop(-1)
-                ziffern[o].bekommt_von.append(o)
+                ziffern[o].bekommt_von.append(aktuelle_ziffer_index)
                 appends.append((requests, o))  # 0.append(1)
-                removes.append((ziffern[o].bekommt_von, o))  # 0.remove(1)
+                removes.append((ziffern[o].bekommt_von, aktuelle_ziffer_index))  # 0.remove(1)
             else:
                 offers.append(aktuelle_ziffer_index)
                 removes.append((offers, aktuelle_ziffer_index))  # 0.remove(1)
@@ -273,9 +273,8 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
         else:
             print("restr")
             # nun wird überprüft, ob ein Ausgleich noch möglich ist der übrigen stäbchen möglich ist
-            ausgleich_möglich = ausgleich_der_stäbchen_iter(aktuelle_ziffer_index + 1, aktionen_übrig,
-                                                            ziffern) if True else ausgleich_der_stäbchen(
-                aktuelle_ziffer_index + 1, aktionen_übrig, ziffern)
+            ausgleich_möglich = ausgleich_der_stäbchen_iter(aktuelle_ziffer_index + 1, aktionen_übrig, ziffern)
+            print("yarak")
             if ausgleich_möglich:
                 print("sas")
                 break
@@ -367,12 +366,10 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):
             for a, b in appends: a.append(b)
             aktiv[index] = False
             char_i[index] += 1
-    return False
+    return False  # TODO Make the false return happen faster if because this check takes forever
 
-#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFAA98BB8B9DFAFEAE888DD888AD8BA8EA8888
-#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFAA98BB8B9DFAFEAE888DD888AD8BA8EA8888
 timer_start()
-pfad = "hexmax4.txt"
+pfad = "hexmax5.txt"
 iterativ = True
 if __name__ == '__main__':
     """

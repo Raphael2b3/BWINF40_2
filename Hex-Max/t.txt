@@ -33,3 +33,8 @@ FFFEA97B55
                         requests.append(aktuelle_ziffer_index)
                         log.append((requests, aktuelle_ziffer_index))  # logbuch
                         aktionen += 1
+
+
+Haugen has leaked one Facebook study that found that 13.5% of U.K. teen girls in one survey say their suicidal thoughts became more frequent after starting on Instagram.
+Another leaked study found 17% of teen girls say their eating disorders got worse after using Instagram.
+About 32% of teen girls said that when they felt bad about their bodies, Instagram made them feel worse, Facebook's researchers found, which was first reported by the Journal.
