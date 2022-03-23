@@ -52,7 +52,6 @@ class Ziffer:
     def __init__(self, char, _id):
         self.id = _id
         self.positions = Ziffer.models[char][:]  # kopiere die Instanz sodass keine Referenz mehr entsteht
-        self.probieren_index = 0
         self.bekommt_von = []
         self.useless_indeces = []
         self.char = char
@@ -148,16 +147,14 @@ def aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index, aktuelle_ziffer)
     :param aktuelle_ziffer:
     :return: aktionen, removes, appends
     """
-    wegnehmen, hinzufügen = aktuelle_ziffer.aktionen_zum_ziel(char)
+    global tabelle
+    inf = tabelle[aktuelle_ziffer.ursprungschar][char]
 
+    aktionen = inf.min_aktion  # es müssen mindetens die unter einander zu tauschenden sticks
     removes = []  # log = [(list, objekt)] later remove objekt from list
     appends = []  # log2 = [(list, objekt)] later append objekt to list
-
-    aktionen = min((wegnehmen, hinzufügen))  # es müssen mindetens die unter einander zu tauschenden sticks
-    # Aktioniert werden
-    g = wegnehmen - hinzufügen
-    for _ in range(abs(g)):
-        if g < 0:  # es wird aus offers genommen
+    for _ in range(abs(inf.stick_mangel)):
+        if inf.stick_mangel > 0:  # es wird aus offers genommen
             if len(offers) > 0:
                 o = offers.pop(-1)
                 aktuelle_ziffer.bekommt_von.append(o)
@@ -167,7 +164,7 @@ def aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index, aktuelle_ziffer)
                 requests.append(aktuelle_ziffer_index)
                 removes.append((requests, aktuelle_ziffer_index))  # 0.remove(1)
                 aktionen += 1
-        elif g > 0:  # es wird aus requests genommen
+        elif inf.stick_mangel < 0:  # es wird aus requests genommen
             if len(requests) > 0:
                 o = requests.pop(-1)
                 ziffern[o].bekommt_von.append(aktuelle_ziffer_index)
@@ -177,6 +174,8 @@ def aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index, aktuelle_ziffer)
                 offers.append(aktuelle_ziffer_index)
                 removes.append((offers, aktuelle_ziffer_index))  # 0.remove(1)
                 aktionen += 1
+    aktuelle_ziffer.char = char
+    aktuelle_ziffer.useless_indeces = inf.useless_indeces.copy()
     return aktionen, removes, appends
 
 
@@ -206,32 +205,27 @@ def ausgabe():
             a += 1
 
 
-def maximiere_ziffern(aktuelle_ziffer_index=0):
-    global versuchsliste, aktionen_übrig, offers, requests, ziffern
-    if aktuelle_ziffer_index == len(ziffern) or aktionen_übrig == 0:
-        return 0 == len(offers) == len(requests)
-    else:
-        aktuelle_ziffer = ziffern[aktuelle_ziffer_index]  # betrachtete aktuelle Ziffer
+def gen_tabelle():
+    t = {}
+    ziffern_ = []
+    for i in range(len(versuchsliste)):
+        ziffern_.append(Ziffer(versuchsliste[i], i))
 
-        for char in versuchsliste:  # iteriert durch alle Hex-Zahlen durch
+    for z in ziffern_:
+        temp = {}
+        for char in versuchsliste:
+            wegnehmen, hinzulegen = z.aktionen_zum_ziel(char)
+            temp[char] = Inf(wegnehmen, hinzulegen, z.useless_indeces.copy())
+        t[z.ursprungschar] = temp
+    return t
 
-            aktionen, removes, appends = aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index, aktuelle_ziffer)
 
-            aktionen_übrig -= aktionen
-            if aktionen_übrig >= 0:
-                # wenn die jetzige ziffer funktionieren kann
-                if maximiere_ziffern(aktuelle_ziffer_index + 1): return True
-                # nun wird überprüft ob ein ausgleich noch möglich ist der übrigen stäbchen möglich ist
-                if ausgleich_der_stäbchen(aktuelle_ziffer_index + 1, aktionen_übrig, ziffern): return True
-                # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
-
-            # aktionen Rückgängig machen
-            aktionen_übrig += aktionen
-            for a, b in removes: a.remove(b)
-            for a, b in appends: a.append(b)
-        aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
-    return False
-    # FFFEA97B55
+def Undo_Log(log, aktionen_übrig):
+    aktionen, removes, appends = log
+    for a, b in removes: a.remove(b)
+    for a, b in appends: a.append(b)
+    aktionen_übrig += aktionen
+    return aktionen_übrig
 
 
 def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, ziffern):
@@ -239,7 +233,7 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
     char_i = [0 for _ in range(len(ziffern))]
     logs: list[tuple[int, list, list]] = [None for _ in range(len(ziffern))]
     aktiv = [False for _ in range(len(ziffern))]
-
+    # TODO MAke this funktion so frickin efficient that even putin will be afrait of it so he lets the people do what they want blyat
     while True:
         if aktuelle_ziffer_index == len(ziffern):
             if 0 == len(offers) == len(requests): break
@@ -266,26 +260,20 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
             aktionen, removes, appends = aktionen_bezogen_auf_situation(char, aktuelle_ziffer_index,
                                                                         aktuelle_ziffer)
             aktionen_übrig -= aktionen
+
             aktiv[aktuelle_ziffer_index] = True
             logs[aktuelle_ziffer_index] = (aktionen, removes, appends)
             if aktionen_übrig >= 0:
                 aktuelle_ziffer_index += 1
         else:
-            print("restr")
             # nun wird überprüft, ob ein Ausgleich noch möglich ist der übrigen stäbchen möglich ist
-            ausgleich_möglich = ausgleich_der_stäbchen_iter(aktuelle_ziffer_index + 1, aktionen_übrig, ziffern)
-            print("yarak")
+            ausgleich_möglich, n_maximal_ausgeglichen = ausgleich_der_stäbchen_iter(aktuelle_ziffer_index + 1, aktionen_übrig, ziffern)
             if ausgleich_möglich:
-                print("sas")
                 break
             # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
 
-            aktionen, removes, appends = logs[aktuelle_ziffer_index]
-
             # aktionen Rückgängig machen
-            aktionen_übrig += aktionen
-            for a, b in removes: a.remove(b)
-            for a, b in appends: a.append(b)
+            aktionen_übrig = Undo_Log(logs[aktuelle_ziffer_index], aktionen_übrig)
             aktiv[aktuelle_ziffer_index] = False
             char_i[aktuelle_ziffer_index] += 1
 
@@ -293,32 +281,6 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
 
 
 # endregion
-
-def ausgleich_der_stäbchen(index, aktionen_übrig, ziffern):
-    """
-    Diese Funktion verteilt beiseite gelegte Sticks auf die restlichen
-    Ziffernsysteme so das dabei auch noch eine maximale Hexadezimalzahl entsteht
-    :param index: index der letzten festgelegten ziffer
-    :return: Erfolg (bool)
-    """
-    zielausgleich = len(offers) + len(requests)
-    if zielausgleich == 0: return True  # Erfolg, wenn nichts mehr auszugleichen ist
-    if index == len(ziffern): return False  # Rekursive -> goes back to the last point
-    aktuelleziffer = ziffern[index]
-    for char in versuchsliste:
-        aktionen, re, ap = aktionen_bezogen_auf_situation(char, index, aktuelleziffer)
-
-        aktionen_übrig -= aktionen
-
-        if aktionen_übrig >= 0:
-            if ausgleich_der_stäbchen(index + 1, aktionen_übrig, ziffern): return True
-        aktionen_übrig += aktionen
-
-        for l, o in ap: l.append(o)
-        for l, o in re: l.remove(o)
-        # aktuelleziffer.char = ursprungschar
-
-    return False
 
 
 def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):
@@ -332,45 +294,62 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):
     logs: list[tuple[int, list, list]] = [None for _ in range(len(ziffern))]
     aktiv = [False for _ in range(len(ziffern))]
     start_index = index
+    ausgleichsvalues = [-1 for _ in range(len(ziffern) + 1)]
+    ausgleichsvalues[len(ziffern)] = 0
     while start_index <= index:
         zielausgleich = len(offers) + len(requests)
         if index == len(ziffern):
-            if zielausgleich == 0: return True
+            if zielausgleich == 0: return True,0
             index -= 1
             continue
 
-        if not aktiv[index]:
-            if zielausgleich == 0: return True
+        if not aktiv[index]:  # first touch
+            if zielausgleich == 0: return True,0
             aktuelle_ziffer = ziffern[index]  # betrachtete aktuelle Ziffer
             ci = char_i[index]
-            if ci == len(versuchsliste):
+            if ci == len(versuchsliste):  # every char was checked
                 char_i[index] = 0
                 aktiv[index] = False
                 index -= 1
                 continue
-            char = versuchsliste[ci]  # iteriert durch alle Hex-Zahlen durch
-            aktionen, removes, appends = aktionen_bezogen_auf_situation(char, index,
-                                                                        aktuelle_ziffer)
-            aktionen_übrig -= aktionen
-            aktiv[index] = True
-            logs[index] = (aktionen, removes, appends)
-            if aktionen_übrig >= 0:
-                index += 1
-        else:
-            # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
-            aktionen, removes, appends = logs[index]
+            char = versuchsliste[ci]
+            aktionen, removes, appends = aktionen_bezogen_auf_situation(char, index, aktuelle_ziffer)
 
+            new_zielausgleich = len(offers) + len(requests)
+            aktionen_übrig -= aktionen
+            if aktionen_übrig < 0 or (-1 < sum(ausgleichsvalues[index+1:]) < new_zielausgleich):
+                aktionen_übrig = Undo_Log((aktionen, removes, appends), aktionen_übrig)
+                char_i[index] += 1
+            else:
+                gewonnener_ausgleich = zielausgleich - new_zielausgleich
+                if gewonnener_ausgleich > ausgleichsvalues[index]: ausgleichsvalues[index] = gewonnener_ausgleich
+                aktiv[index] = True
+                logs[index] = (aktionen, removes, appends)
+                index += 1
+        else:  # second touch
+            # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
+            aktionen_übrig = Undo_Log(logs[index], aktionen_übrig)
             # aktionen Rückgängig machen
-            aktionen_übrig += aktionen
-            for a, b in removes: a.remove(b)
-            for a, b in appends: a.append(b)
             aktiv[index] = False
             char_i[index] += 1
-    return False  # TODO Make the false return happen faster if because this check takes forever
+    return False,sum(ausgleichsvalues[start_index:])
+
+
+class Inf:
+
+    def __init__(self, weg, hin, useless_i):
+        self.min_aktion = min(weg, hin)
+        self.weg = weg
+        self.hin = hin
+        self.stick_mangel = hin - weg
+        self.useless_indeces = useless_i
+
+    def __eq__(self, other):
+        return self.weg == other.weg and self.hin == other.hin and self.useless_indeces == other.useless_indeces
+
 
 timer_start()
 pfad = "hexmax5.txt"
-iterativ = True
 if __name__ == '__main__':
     """
     Definitionen: 
@@ -383,19 +362,18 @@ if __name__ == '__main__':
     |_  |_  |_  |   |_| |_|   | |_  |_| |_  
     |   |   |   |_   _|  _|   | |_|  _|  _| 
     """
+    versuchsliste = "FEDCBA9876543210"  # Hex-Zahlen zum durch iterieren
+    tabelle = gen_tabelle()  # tabelle[goalchar][startchar]
     ziffern, aktionen_übrig = get_input(pfad)  # input aus Text-Datei
     offers = []  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
     requests = []  # liste von ziffer_ids dessen ziffer striche Anfragen
-    versuchsliste = "FEDCBA9876543210"  # Hex-Zahlen zum durch iterieren
-    if not iterativ:
-        maximiere_ziffern()
-    else:
-        maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, ziffern)  # haupt funktion
+    maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, ziffern)  # haupt funktion
 
     ausgabe()
 
 timer_stop()
-
+#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8DE88BAA8ADD888898E9BA88AD98988F898AB7AF7BDA8A61BA7D4AD8F888
+#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8DE88BAA8ADD888898E9BA88AD98988F898AB7AF7BDA8A61BA7D4AD8F888
 """
 Idee 1.0
 
