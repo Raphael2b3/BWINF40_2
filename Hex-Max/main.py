@@ -233,7 +233,8 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
     char_i = [0 for _ in range(len(ziffern))]
     logs: list[tuple[int, list, list]] = [None for _ in range(len(ziffern))]
     aktiv = [False for _ in range(len(ziffern))]
-    # TODO MAke this funktion so frickin efficient that even putin will be afrait of it so he lets the people do what they want blyat
+    mögliche_ausgleiche = [{} for _ in range(len(ziffern)+1)]
+
     while True:
         if aktuelle_ziffer_index == len(ziffern):
             if 0 == len(offers) == len(requests): break
@@ -263,13 +264,20 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
 
             aktiv[aktuelle_ziffer_index] = True
             logs[aktuelle_ziffer_index] = (aktionen, removes, appends)
+            zielausgleich = len(offers) + len(requests)
             if aktionen_übrig >= 0:
-                aktuelle_ziffer_index += 1
+
+                if aktionen_übrig not in mögliche_ausgleiche[aktuelle_ziffer_index + 1] or \
+                        mögliche_ausgleiche[aktuelle_ziffer_index + 1][aktionen_übrig] >= zielausgleich:
+                    aktuelle_ziffer_index += 1
         else:
             # nun wird überprüft, ob ein Ausgleich noch möglich ist der übrigen stäbchen möglich ist
-            ausgleich_möglich, n_maximal_ausgeglichen = ausgleich_der_stäbchen_iter(aktuelle_ziffer_index + 1, aktionen_übrig, ziffern)
+            ausgleich_möglich, n_maximal_ausgeglichen = ausgleich_der_stäbchen_iter(aktuelle_ziffer_index + 1,
+                                                                                    aktionen_übrig, ziffern)
             if ausgleich_möglich:
                 break
+            if aktionen_übrig not in mögliche_ausgleiche[aktuelle_ziffer_index+1]:
+                mögliche_ausgleiche[aktuelle_ziffer_index + 1][aktionen_übrig] = n_maximal_ausgeglichen
             # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
 
             # aktionen Rückgängig machen
@@ -299,12 +307,12 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):
     while start_index <= index:
         zielausgleich = len(offers) + len(requests)
         if index == len(ziffern):
-            if zielausgleich == 0: return True,0
+            if zielausgleich == 0: return True, 0
             index -= 1
             continue
 
         if not aktiv[index]:  # first touch
-            if zielausgleich == 0: return True,0
+            if zielausgleich == 0: return True, 0
             aktuelle_ziffer = ziffern[index]  # betrachtete aktuelle Ziffer
             ci = char_i[index]
             if ci == len(versuchsliste):  # every char was checked
@@ -317,7 +325,7 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):
 
             new_zielausgleich = len(offers) + len(requests)
             aktionen_übrig -= aktionen
-            if aktionen_übrig < 0 or (-1 < sum(ausgleichsvalues[index+1:]) < new_zielausgleich):
+            if aktionen_übrig < 0 or (-1 < sum(ausgleichsvalues[index + 1:]) < new_zielausgleich):
                 aktionen_übrig = Undo_Log((aktionen, removes, appends), aktionen_übrig)
                 char_i[index] += 1
             else:
@@ -332,7 +340,7 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):
             # aktionen Rückgängig machen
             aktiv[index] = False
             char_i[index] += 1
-    return False,sum(ausgleichsvalues[start_index:])
+    return False, sum(ausgleichsvalues[start_index:])
 
 
 class Inf:
@@ -372,8 +380,8 @@ if __name__ == '__main__':
     ausgabe()
 
 timer_stop()
-#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8DE88BAA8ADD888898E9BA88AD98988F898AB7AF7BDA8A61BA7D4AD8F888
-#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8DE88BAA8ADD888898E9BA88AD98988F898AB7AF7BDA8A61BA7D4AD8F888
+# FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8DE88BAA8ADD888898E9BA88AD98988F898AB7AF7BDA8A61BA7D4AD8F888
+# FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB8DE88BAA8ADD888898E9BA88AD98988F898AB7AF7BDA8A61BA7D4AD8F888
 """
 Idee 1.0
 
