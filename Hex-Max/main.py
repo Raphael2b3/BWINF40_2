@@ -134,6 +134,9 @@ class Dictionary2d:
         return self.value[key1][key2]
 
     def set_value(self, key1, key2, value):
+        t = value[0]
+        self.set_value_extra(key1, key2, value)
+        return
         if key1 not in self.value:
             self.value[key1] = {key2: value}
         else:
@@ -145,8 +148,16 @@ class Dictionary2d:
         else:
             for k in self.value[key1].keys():
                 if k > key2:
-                    if self.value[key1][k] < value:
-                        self.value[key1][k] = value
+                    if self.value[key1][k][0] < value[0]:
+                        self.value[key1][k][0] = value[0]
+                    if self.value[key1][k][1] < value[1]:
+                        self.value[key1][k][1] = value[1]
+                else:
+                    if self.value[key1][k][0] > value[0]:
+                        value[0] = self.value[key1][k][0]
+                    if self.value[key1][k][1] < value[1]:
+                        value[0] = self.value[key1][k][0]
+
             self.value[key1][key2] = value
 
 
@@ -207,7 +218,7 @@ def try_change_char(start_char, zielchar, offers, requests):
     """
     global tabelle
     d_offers, d_requests = 0, 0
-    # TODO Überarbeite die art und weise wie du äste skipst beim ausprobieren
+    bu_offers, bu_requests = offers, requests
     inf = tabelle[start_char][zielchar]
     aktionen = inf.min_aktion  # es müssen mindetens die unter einander zu tauschenden sticks
     if inf.stick_mangel > 0:  # es wird aus offers genommen
@@ -216,8 +227,6 @@ def try_change_char(start_char, zielchar, offers, requests):
         if offers < 0:  # es muss eine eigene request aufgegeben werden...
             aktionen -= offers  # ...das ist eine extra aktion
             requests -= offers
-            d_requests -= offers
-            d_offers -= offers  # weil offers ist momentan <0 und bildet auch den überhängsel ab,
             # dieser muss aus dem delta entfernt werden...
             offers = 0  # ...da offers auf 0 gesetzt wird
     elif inf.stick_mangel < 0:  # es wird aus requests genommen
@@ -226,19 +235,15 @@ def try_change_char(start_char, zielchar, offers, requests):
         if requests < 0:  # es muss ein angebot für alle sichtbar erstellt werden
             aktionen -= requests  # das kostet
             offers -= requests  # offers erhöht sich
-            d_offers -= requests
-            d_requests -= requests
             requests = 0
 
-    return aktionen, offers, requests, d_offers, d_requests
+    return aktionen, offers, requests, d_offers, d_requests, bu_offers, bu_requests
 
 
-def undo_action(log, aktionen_übrig, offers, requests):
-    aktionen, d_offers, d_requests = log
+def undo_action(log, aktionen_übrig):
+    aktionen, d_offers, d_requests, bu_offers, bu_requests = log
     aktionen_übrig += aktionen
-    offers -= d_offers
-    requests -= d_requests
-    return aktionen_übrig, offers, requests
+    return aktionen_übrig, bu_offers, bu_requests
 
 
 def aktionen_planen(aktuelle_ziffer, offers, requests, tabelle):
@@ -307,14 +312,17 @@ def gen_tabelle():
     return t
 
 
+db = 0
+
+
 def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, ziffern):
+    global db
     _index = 0
     mögliche_ausgleiche = Dictionary2d()
     while True:
         if _index == len(ziffern):
             if 0 == offers == requests:
                 print("Es passt halt 1 Line 316")
-                input()
                 break
             _index -= 1
             continue
@@ -327,56 +335,53 @@ def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, zif
                     break
                 _index -= 1
                 continue
-            if aktuelle_ziffer.char_i == len(versuchsliste):
-                aktuelle_ziffer.char_i = 0
-                aktuelle_ziffer.active = False
-                _index -= 1
-                continue
-
+            aktuelle_ziffer.active = True
             char = versuchsliste[aktuelle_ziffer.char_i]  # iteriert durch alle Hex-Zahlen durch
-            aktionen, offers, requests, d_offers, d_requests = try_change_char(aktuelle_ziffer.ursprungschar, char,
-                                                                               offers, requests)
-            log = (aktionen, d_offers, d_requests)
+            aktionen, offers, requests, d_offers, d_requests, bu_offers, bu_requests = try_change_char(
+                aktuelle_ziffer.ursprungschar, char,
+                offers, requests)
+            log = (aktionen, d_offers, d_requests, bu_offers, bu_requests)
             aktionen_übrig -= aktionen
 
             if aktionen_übrig < 0:
-                aktionen_übrig, offers, requests = undo_action(log, aktionen_übrig, offers, requests)
-                aktuelle_ziffer.char_i += 1
                 continue
 
             if mögliche_ausgleiche.key_exists(_index + 1, aktionen_übrig):
                 zielausgleich = offers + requests
                 ausgleichswert = mögliche_ausgleiche.get_value(_index + 1, aktionen_übrig)
-                if ausgleichswert[0 if offers > 0 else 1] < zielausgleich:
-                    aktionen_übrig, offers, requests = undo_action(log, aktionen_übrig, offers, requests)
-                    aktuelle_ziffer.char_i += 1
-                    continue
+
+                db += 1
+                if db == 8:
+                    print(db)
+
+                if ausgleichswert[0 if offers > 0 else 1] < zielausgleich: continue
             aktuelle_ziffer.log = log
-            aktuelle_ziffer.active = True
             aktuelle_ziffer.char = char
             _index += 1
         else:
-            # nun wird überprüft, ob ein Ausgleich noch möglich ist der übrigen stäbchen möglich ist
-            ausgleich_möglich, n_maximal_ausgeglichen = ausgleich_der_stäbchen_iter(_index + 1,
-                                                                                    aktionen_übrig, ziffern, offers,
-                                                                                    requests)
-            a,b = n_maximal_ausgeglichen
-            if a != 0 and b != 0:
-                input("big problem")
-            # print("ausgleich",offers+requests-n_maximal_ausgeglichen,"aktions left",aktionen_übrig, "ziffer", aktuelle_ziffer)
-            if ausgleich_möglich:
-                print("Nach nem AusgleichLine 365")
-                break
-            if not mögliche_ausgleiche.key_exists(_index + 1, aktionen_übrig):
-                mögliche_ausgleiche.set_value(_index + 1, aktionen_übrig, n_maximal_ausgeglichen)
-            # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
 
+            if aktionen_übrig >= 0:
+                # nun wird überprüft, ob ein Ausgleich noch möglich ist der übrigen stäbchen möglich ist
+                ausgleich_möglich, n_maximal_ausgeglichen = ausgleich_der_stäbchen_iter(_index + 1,
+                                                                                        aktionen_übrig, ziffern, offers,
+                                                                                        requests)
+                # print("ausgleich",offers+requests-n_maximal_ausgeglichen,"aktions left",aktionen_übrig, "ziffer", aktuelle_ziffer)
+                if ausgleich_möglich:
+                    print("Nach nem AusgleichLine 365")
+                    break
+
+                if not mögliche_ausgleiche.key_exists(_index + 1, aktionen_übrig):
+                    mögliche_ausgleiche.set_value(_index + 1, aktionen_übrig, n_maximal_ausgeglichen)
+            # wenn der danach nicht geklappt hat wird versucht die momentane Stellung irgendwie möglich zu machen
+            aktionen, d_offers, d_requests, bu_offers, bu_requests = aktuelle_ziffer.log
             # aktionen Rückgängig machen
-            aktionen_übrig, offers, requests = undo_action(aktuelle_ziffer.log, aktionen_übrig, offers, requests)
+            aktionen_übrig, offers, requests = aktionen_übrig + aktionen, bu_offers, bu_requests
             aktuelle_ziffer.active = False
             aktuelle_ziffer.char_i += 1
             aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
-
+            if aktuelle_ziffer.char_i == len(versuchsliste):
+                aktuelle_ziffer.char_i = 0
+                _index -= 1
     return True
 
 
@@ -397,62 +402,47 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern, offers, reques
         zielausgleich = offers + requests
         if index == len(ziffern):
             if zielausgleich == 0: return True, 0
-            ausgleichsvalues2.set_value(index, aktionen_übrig, (0, 0))
+            ausgleichsvalues2.set_value(index, aktionen_übrig, [0, 0])
             index -= 1
             continue
         # betrachtete aktuelle Ziffer
         aktuelle_ziffer = ziffern[index]
         if not aktuelle_ziffer.active:  # first touch
             if zielausgleich == 0: return True, 0
-            if aktuelle_ziffer.char_i == len(versuchsliste):  # every char was checked
-                aktuelle_ziffer.char_i = 0
-                aktuelle_ziffer.active = False
-                index -= 1
-                continue
+            aktuelle_ziffer.active = True
             char = versuchsliste[aktuelle_ziffer.char_i]
 
-            aktionen, offers, requests, d_offers, d_requests = try_change_char(aktuelle_ziffer.ursprungschar, char,
-                                                                               offers, requests)
-            log = (aktionen, d_offers, d_requests)
+            aktionen, offers, requests, d_offers, d_requests, bu_offers, bu_requests = try_change_char(
+                aktuelle_ziffer.ursprungschar, char, offers, requests)
+            log = (aktionen, d_offers, d_requests, bu_offers, bu_requests)
             aktionen_übrig -= aktionen
             new_zielausgleich = offers + requests
 
-            if aktionen_übrig < 0:
-                aktionen_übrig, offers, requests = undo_action(log, aktionen_übrig, offers, requests)
-                aktuelle_ziffer.char_i += 1
-                continue
+            if aktionen_übrig < 0 and ausgleichsvalues2.key_exists(index, aktionen_übrig + aktionen): continue
             if ausgleichsvalues2.key_exists(index + 1, aktionen_übrig) and ausgleichsvalues2.key_exists(index,
                                                                                                         aktionen_übrig + aktionen):
                 max_ausgleich = ausgleichsvalues2.get_value(index + 1, aktionen_übrig)
-                if max_ausgleich[0 if offers>0 else 1] < new_zielausgleich:
-                    aktionen_übrig, offers, requests = undo_action(log, aktionen_übrig, offers, requests)
-                    aktuelle_ziffer.char_i += 1
-                    continue
-            aktuelle_ziffer.active = True
+                if max_ausgleich[0 if offers > 0 else 1] < new_zielausgleich: continue
+
             aktuelle_ziffer.log = log
             aktuelle_ziffer.char = char
             index += 1
         else:  # second touch
-            aktionen, d_offers, d_requests = aktuelle_ziffer.log
-            upperwin = ausgleichsvalues2.get_value(index + 1, aktionen_übrig)
+            aktionen, d_offers, d_requests, bu_offers, bu_requests = aktuelle_ziffer.log
             # aktionen_übrig += aktionen; offers -= d_offers; requests -= d_requests
-            aktionen_übrig, offers, requests = undo_action(aktuelle_ziffer.log, aktionen_übrig, offers, requests)
+            aktionen_übrig, offers, requests = aktionen_übrig + aktionen, bu_offers, bu_requests
             aktuelle_ziffer.active = False
             aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
             aktuelle_ziffer.char_i += 1
+            if ausgleichsvalues2.key_exists(index + 1, aktionen_übrig):
+                upperwin = ausgleichsvalues2.get_value(index + 1, aktionen_übrig)
+                actual_win = [-d_offers + upperwin[0], - d_requests + upperwin[1]]
 
-            # ist das der char der den höchsten ausgleich macht?
-            gewonnener_ausgleich = -d_offers - d_requests  # weil d_offers die zunahme beschreibt...
-            actual_win = -d_offers + upperwin[0], - d_requests + upperwin[1]
+                ausgleichsvalues2.set_value(index, aktionen_übrig, actual_win)  # überschreibt wenn das zu vor kagge war
 
-            # ...wir gewinnen aber wenn d_offers <0
-            if not ausgleichsvalues2.key_exists(index, aktionen_übrig):
-                ausgleichsvalues2.set_value(index, aktionen_übrig, actual_win)
-                # u can set it 0 by default because
-                # there is always the chance to keep the char at its state
-            elif ausgleichsvalues2.get_value(index, aktionen_übrig) <= sum(actual_win):
-                # set this new max value only if
-                ausgleichsvalues2.set_value(index, aktionen_übrig, actual_win)
+            if aktuelle_ziffer.char_i == len(versuchsliste):  # every char was checked
+                aktuelle_ziffer.char_i = 0
+                index -= 1
 
     return False, ausgleichsvalues2.get_value(start_index, aktionen_übrig)
 
