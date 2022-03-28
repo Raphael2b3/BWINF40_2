@@ -11,7 +11,9 @@ def timer_stop():
     perf.set_time_point("Stop")
 
 
-class Shortest_path_database:
+class ShortestPathDatabase:
+
+    # Mit dem Deikstraalgorithmus wird für einen Graphen und einem Startpunkt alle Kürzesten wege berechnet
 
     def __init__(self, _start_id, graph, geblockte_kanten):
         n_knoten = len(graph.knoten)
@@ -26,7 +28,6 @@ class Shortest_path_database:
 
         # region Daijkstra Algorithm iterative
         betrachteter_knoten_id = _start_id
-
         while False in fertige:
             betrachteter_knoten = knoten[betrachteter_knoten_id]
 
@@ -59,8 +60,9 @@ class Shortest_path_database:
         self.wege = wege
         self.fertige = fertige
 
-    def kürzester_weg_zu(self, _id):
+    def shortest_path(self, _id):
         return self.wege[_id] if self.fertige[_id] else self.INFWEG
+        # wenn weg nicht existiert ist der Weg unendlich lang
 
 
 class Weg:
@@ -110,7 +112,7 @@ class Weg:
         currentpos = self.start
         for w in self.kanten:
             ziel = w.anderer_knoten(currentpos)
-            t += f"->({w.gewicht})K{ziel}"
+            t += f"->K{ziel}"
             currentpos = ziel
         return t
 
@@ -123,17 +125,12 @@ class Kante:
         self.gewicht = gewicht
         self.used = 0
 
-    def __str__(self):
-        return f"Kante: K{self.start} -> K{self.stop}({self.gewicht})"
-
     def __eq__(self, other):
         return self.id == other
 
     def anderer_knoten(self, knoten):
-        if knoten == self.stop:
-            return self.start
-        if knoten == self.start:
-            return self.stop
+        return self.start if knoten == self.stop else self.stop
+
 
 
 class Knoten:
@@ -161,19 +158,19 @@ class Graph:
     def __init__(self, _knoten, _kanten):
         self.knoten = _knoten
         self.kanten = _kanten
-        self.kürzeste_wege: dict[int, Shortest_path_database] = {}
+        self.kürzeste_wege: dict[int, ShortestPathDatabase] = {}
 
-    def kürzester_weg_baum(self, start, blocked=None) -> Shortest_path_database:
+    def kürzester_weg_baum(self, start, blocked=None) -> ShortestPathDatabase:
         if blocked is not None and len(blocked) > 0:
-            return Shortest_path_database(start, self, blocked)
+            return ShortestPathDatabase(start, self, blocked)
         if start in self.kürzeste_wege:
             return self.kürzeste_wege[start]
-        _wege = self.kürzeste_wege[start] = Shortest_path_database(start, self, [])
+        _wege = self.kürzeste_wege[start] = ShortestPathDatabase(start, self, [])
         return _wege
 
 
 def get_input():
-    pfad = "muellabfuhr0.txt"
+    pfad = "muellabfuhr5.txt"
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     zeilen.pop(-1)
@@ -200,7 +197,6 @@ timer_start()
 if __name__ == '__main__':
     verfügbareTage = 5  # von montag bis freitag sind 5 tage
     start_position = 0
-
     graph = get_input()
 
     n_besuchtekanten = 0
@@ -315,7 +311,7 @@ if __name__ == '__main__':
             bester_weg = None
 
             for strecke in strecken:
-                weg = wege.kürzester_weg_zu(strecke.knoten[-1])
+                weg = wege.shortest_path(strecke.knoten[-1])
                 tmp_strecketotal = weg.gewicht + strecke.gewicht
                 if strecketotal <= tmp_strecketotal or weg.gewicht == 0: continue
                 weg = weg.copy()
@@ -366,7 +362,7 @@ if __name__ == '__main__':
     # region Rückwege generieren
     rückwege = graph.kürzester_weg_baum(0)
     for strecke in strecken:
-        rw = rückwege.kürzester_weg_zu(strecke.knoten[-1]).copy()
+        rw = rückwege.shortest_path(strecke.knoten[-1]).copy()
         rw.reverse()
         strecke.add(rw)
     # endregion
@@ -380,14 +376,6 @@ if __name__ == '__main__':
         print()
     print("-Ende-")
 
-    for kante in graph.kanten:
-        s = False
-        for auto in strecken:
-            if kante in auto.kanten:
-                s = True
-                break
-        if not s:
-            print("Ergbnis FALSCH")
     # endregion
 
 timer_stop()

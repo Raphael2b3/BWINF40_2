@@ -156,7 +156,7 @@ class Ziffer:
         return self.char
 
 
-class Dictionary2d:
+class Char_information_Dict2D:
 
     def __init__(self):
         self.value = {}
@@ -355,7 +355,7 @@ def gen_tabelle():
         temp = {}
         for char in versuchsliste:
             wegnehmen, hinzulegen = z.aktionen_zum_ziel(char)
-            temp[char] = Inf(wegnehmen, hinzulegen, z.useless_indeces.copy())
+            temp[char] = Ziffern_change_information(wegnehmen, hinzulegen, z.useless_indeces.copy())
         t[z.ursprungschar] = temp
     return t
 
@@ -377,7 +377,7 @@ def Undo_Log(log, index):
 def maximiere_ziffern_iter(versuchsliste, aktionen_übrig, offers, requests, ziffern):
     _index = 0
     logs = [None for _ in range(len(ziffern))]
-    mögliche_ausgleiche = Dictionary2d()
+    mögliche_ausgleiche = Char_information_Dict2D()
     while True:
         if _index == len(ziffern):
             if 0 == offers == requests: break
@@ -455,7 +455,7 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):  # TODO not r
     logs_: list[tuple[int, list, list]] = [None for _ in range(len(ziffern))]
     aktiv = [False for _ in range(len(ziffern))]
     start_index = index
-    ausgleichsvalues = Dictionary2d()
+    ausgleichsvalues = Char_information_Dict2D()
     while start_index <= index:
         zielausgleich = len(offers) + len(requests)
         if index == len(ziffern):
@@ -513,7 +513,7 @@ def ausgleich_der_stäbchen_iter(index, aktionen_übrig, ziffern):  # TODO not r
     return False, ausgleichsvalues.get_value(start_index, aktionen_übrig)
 
 
-class Inf:
+class Ziffern_change_information:
 
     def __init__(self, weg, hin, useless_i):
         self.min_aktion = min(weg, hin)
