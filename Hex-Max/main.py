@@ -1,35 +1,4 @@
-import performance_analysing
-
-# region performance
-perf = performance_analysing.time_analysing()
-
-
-def timer_start():
-    perf.set_time_point("Start")
-    print()
-
-
-def timer_stop():
-    print()
-    perf.set_time_point("Stop")
-
-
-# endregion
-
-# region Finished
 class ZifferSystem:
-    """
-        Eine Ziffer hat 7 positionen mit die mit stichen belegt werden können
-          _0_
-        3|_1_|4
-        5|_2_|6
-
-         _
-        |_  = F =^ [1,1,0,1,0,1,0] // 1 = True; 0 = False
-        |
-
-        wir erstellen Listen die die Hexadezimalzahlen abbilden können.
-        """
     models = {
         '0': [True, False, True, True, True, True, True],
         '1': [False, False, False, False, True, False, True],
@@ -61,12 +30,6 @@ class ZifferSystem:
         self.log = None
 
     def aktionen_zum_ziel(self, ziel_char):
-        """
-        Gibt informationen wie viele Sticks falsch an ihren Platz sind und unterteilt das in
-        Falsch weil stick Fehlt und Falsch weil Stick nicht da sein dürfte
-        :param ziel_char:
-        :return: wegnehmen, hinzufügen (für übergebenen char)
-        """
         self.char = ziel_char  # setzt den char wert zum ziel
         model = ZifferSystem.models[ziel_char]
         wegnehmen = 0
@@ -104,17 +67,11 @@ class ZifferSystem:
             t_logs.append(log)
         return t_logs
 
-    def __str__(self):
-        return f"{self.char} ci{self.char_i} act{self.active} log{self.log} id{self.id}"
-
 
 class CharInformationDict2D:
 
     def __init__(self):
         self.value = {}
-
-    def __contains__(self, item):
-        return item in self.value
 
     def key_exists(self, key1, key2=None):
         if not key1 in self.value:
@@ -125,31 +82,29 @@ class CharInformationDict2D:
 
     def get_value(self, key1, key2=None):
         if not key1 in self.value:
-            return 0
+            raise
         if key2 is None:
             return self.value[key1]
         if key2 not in self.value[key1]:
-            # v = self.value[key1][key2] = self.get_value(key1+1, 0)
-            return 0
+            raise
         return self.value[key1][key2]
 
     def set_value_filtered(self, key1, key2, value):
         if key1 not in self.value:
             self.value[key1] = {key2: value}
         else:
-            for k in self.value[key1].keys():
-                if k > key2:
-                    if self.value[key1][k][0] < value[0]:
-                        self.value[key1][k][0] = value[0]
-                    if self.value[key1][k][1] < value[1]:
-                        self.value[key1][k][1] = value[1]
-                else:
+            for k in self.value[key1].keys():  # index=0: Wenn Situation überschüssige Sticks | index=1:  " " Stick mangel hat
+                if k > key2:  # die situationen beidem aktionen verfügbar waren
+                    if self.value[key1][k][0] < value[0]:  # Offers werden betrachtet
+                        self.value[key1][k][0] = value[0]  # wenn aktuell mehr ausgeglichen wird, dieser Wert besser
+                    if self.value[key1][k][1] < value[1]:  # requests werden betrachtet
+                        self.value[key1][k][1] = value[1]  # wenn aktuell mehr ausgeglichen wird, dieser Wert besser
+                else:  # wenn schonmal besser ausgeglichen wurde
                     if self.value[key1][k][0] > value[0]:
-                        value[0] = self.value[key1][k][0]
+                        value[0] = self.value[key1][k][0]  # der neue Value übernimmt den besseren
                     if self.value[key1][k][1] < value[1]:
-                        value[0] = self.value[key1][k][0]
-
-            self.value[key1][key2] = value
+                        value[0] = self.value[key1][k][0]  # der neue Value übernimmt den besseren
+            self.value[key1][key2] = value  # set modified value
 
 
 class ZiffernChangeInformation:
@@ -199,12 +154,8 @@ def print_ziffern(list_ziffern):  # printet die momentane Anordnung der Sticks
 
 
 def try_change_char(start_char, zielchar, offers, requests):
-    """
-    Findet heraus wie viele aktionen wirklich getan werden müssen und berücksichtigt dabei schon beiseite gelegte sticks
-    :return: aktionen, offers, requests, d_offers(zunahme), d_requests(zunahme)
-    """
     global tabelle
-    d_offers, d_requests = 0, 0
+    d_offers, d_requests = 0, 0  # veränderung/Delta
     bu_offers, bu_requests = offers, requests
     inf = tabelle[start_char][zielchar]
     aktionen = inf.min_aktion  # es müssen mindetens die unter einander zu tauschenden sticks
@@ -304,10 +255,9 @@ def gen_tabelle():
 def maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffern):
     # man geht immer vom best case aus
     _index = 0
-    ausgleichs_werte = CharInformationDict2D()
     while True:
         if _index == len(ziffern):  # wenn es keine Ziffern mehr zum Verändern gibt
-            if 0 == offers == requests:  # win condition
+            if 0 == offers - requests:  # win condition
                 print("Es passt halt 1 Line 316")
                 break
             _index -= 1  # Miserfolg
@@ -316,7 +266,7 @@ def maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffer
         aktuelle_ziffer = ziffern[_index]  # betrachtete aktuelle Ziffer
         if not aktuelle_ziffer.active:  # aktuelle ziffer wird betrachtet
             if actions_left == 0:  # die ziffer kann sich nicht mehr verändern nach Schema 1
-                if 0 == offers == requests:  # win condition
+                if 0 == offers - requests:  # win condition
                     print("Es passt halt 2 Line 324")
                     break
                 _index -= 1  # Misserfolg
@@ -339,7 +289,8 @@ def maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffer
                 # falls schon berechnet wurde, was der maximale Ausgleichswert ist
                 zielausgleich = offers + requests  # offers oder requests ist 0
                 ausgleichswert = ausgleichs_werte.get_value(_index + 1, actions_left)
-                if ausgleichswert[0 if offers > 0 else 1] < zielausgleich:  # wenn der Zielausgleich nicht erreicht werden kann
+                if ausgleichswert[
+                    0 if offers > 0 else 1] < zielausgleich:  # wenn der Zielausgleich nicht erreicht werden kann
                     continue  # wir wissen, dass dieser Char nicht möglich ist
             _index += 1  # nächste ziffer wird betrachtet
         else:
@@ -353,16 +304,13 @@ def maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffer
                                                                                    actions_left, ziffern, offers,
                                                                                    requests)
                 if ausgleichbar: break  # win condition
-
                 # setzt nur, wenn es noch nicht existiert und wirklich besser ist
-                ausgleichs_werte.set_value_filtered(_index, actions_left + aktionen, n_maximal_ausgeglichen)
-
+                # ausgleichs_werte.set_value_filtered(_index, actions_left + aktionen, n_maximal_ausgeglichen)
             # Simulation rückgängig machen
             actions_left, offers, requests = actions_left + aktionen, bu_offers, bu_requests
             aktuelle_ziffer.active = False
             aktuelle_ziffer.char_i += 1
             aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
-
             if aktuelle_ziffer.char_i == len(versuchsliste):
                 aktuelle_ziffer.char_i = 0
                 _index -= 1
@@ -370,20 +318,14 @@ def maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffer
 
 
 def ausgleich_der_stäbchen_iter(index, actions_left, ziffern, offers, requests):
-    global ausgleichs_werte2
-    """
-    Diese Funktion verteilt beiseite gelegte Sticks auf die restlichen
-    Ziffernsysteme so das dabei auch noch eine maximale Hexadezimalzahl entsteht
-    :param index: index der letzten festgelegten ziffer
-    :return: Erfolg (bool)
-    """
+    global ausgleichs_werte
 
     start_index = index
     while start_index <= index:
         zielausgleich = offers + requests
         if index == len(ziffern):  # keine Ziffern mehr überprüfbar
             if zielausgleich == 0: return True, 0  # win condition
-            ausgleichs_werte2.set_value_filtered(index, actions_left, [0, 0])
+            ausgleichs_werte.set_value_filtered(index, actions_left, [0, 0])
             index -= 1
             continue
         # betrachtete aktuelle Ziffer
@@ -405,9 +347,9 @@ def ausgleich_der_stäbchen_iter(index, actions_left, ziffern, offers, requests)
             if actions_left < 0:
                 continue  # dieser char funktioniert nicht, weil zu viele aktionen gebraucht werden
 
-            if ausgleichs_werte2.key_exists(index + 1, actions_left):  # wenn wir den besten ausgleichswert
+            if ausgleichs_werte.key_exists(index + 1, actions_left):  # wenn wir den besten ausgleichswert
                 # von den nächsten Ziffern kennen
-                max_ausgleich = ausgleichs_werte2.get_value(index + 1, actions_left)
+                max_ausgleich = ausgleichs_werte.get_value(index + 1, actions_left)
                 if max_ausgleich[0 if offers > 0 else 1] < new_zielausgleich:
                     continue  # wir können diesen Char ausschließen
             index += 1  # die Nächste Ziffer wird betrachtet
@@ -421,46 +363,29 @@ def ausgleich_der_stäbchen_iter(index, actions_left, ziffern, offers, requests)
             aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
             aktuelle_ziffer.char_i += 1
 
-            if ausgleichs_werte2.key_exists(index + 1,
-                                            actions_left):  # wenn wir den Ausgleichswert von der nächsten Ziffer kennen
-                upperwin = ausgleichs_werte2.get_value(index + 1, actions_left)  # was ist dieser Wert?
+            if ausgleichs_werte.key_exists(index + 1,
+                                           actions_left):  # wenn wir den Ausgleichswert von der nächsten Ziffer kennen
+                upperwin = ausgleichs_werte.get_value(index + 1, actions_left)  # was ist dieser Wert?
                 actual_win = [(-d_offers) + upperwin[0], (-d_requests) + upperwin[1]]
                 # wie hoch wäre dieser Win auf unsere Situation
-                ausgleichs_werte2.set_value_filtered(index, actions_left,
-                                                     actual_win)  # setzt es nur, wenn es auch wirklich besser ist
+                ausgleichs_werte.set_value_filtered(index, actions_left,
+                                                    actual_win)  # setzt es nur, wenn es auch wirklich besser ist
 
             if aktuelle_ziffer.char_i == len(versuchsliste):  # every char was checked
                 aktuelle_ziffer.char_i = 0
                 index -= 1
-    return False, ausgleichs_werte2.get_value(start_index, actions_left)
+    return False, ausgleichs_werte.get_value(start_index, actions_left)
 
 
-# endregion
-
-timer_start()
-
-pfad = "hexmax0.txt"
 if __name__ == '__main__':
-    """
-    Definitionen: 
-    - Ziffer: Eine Instanz der Klasse Ziffer, enthält Informationen über ob die "Sticks" an einer Position sind
-    - Ziffersystem: Meint die möglichen Postionen in einer Ziffer
-    
-    FFFC438B55
-    FFFC997B95
-     _   _   _   _   _   _   _       _   _  
-    |_  |_  |_  |   |_| |_|   | |_  |_| |_  
-    |   |   |   |_   _|  _|   | |_|  _|  _| 
-    """
-    ausgleichs_werte2 = CharInformationDict2D()
+    ausgleichs_werte = CharInformationDict2D()
     versuchsliste = "FEDCBA9876543210"  # Hex-Zahlen zum durch iterieren
     tabelle = gen_tabelle()  # tabelle[goalchar][startchar]
-    ziffern, actions_left = get_input(pfad)  # input aus Text-Datei
     offers = 0  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
     requests = 0  # liste von ziffer_ids dessen ziffer striche Anfragen
+
+    pfad = input("Geben sie den Pfad zur Input-Datei an:\n->")
+    ziffern, actions_left = get_input(pfad)  # input aus Text-Datei
+
     maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffern)  # haupt funktion
-
     ausgabe()
-    print("\nout of", actions_left)
-
-timer_stop()
