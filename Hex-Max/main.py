@@ -1,3 +1,14 @@
+from builtins import print as _print
+
+
+def print(*argumente, end="\n"):
+    global outputstr
+    for arg in argumente:
+        outputstr += str(arg) + " "
+    outputstr += end
+    _print(*argumente, end=end)
+
+
 class ZifferSystem:
     models = {
         '0': [True, False, True, True, True, True, True],
@@ -93,7 +104,8 @@ class CharInformationDict2D:
         if key1 not in self.value:
             self.value[key1] = {key2: value}
         else:
-            for k in self.value[key1].keys():  # index=0: Wenn Situation überschüssige Sticks | index=1:  " " Stick mangel hat
+            for k in self.value[
+                key1].keys():  # index=0: Wenn Situation überschüssige Sticks | index=1:  " " Stick mangel hat
                 if k > key2:  # die situationen beidem aktionen verfügbar waren
                     if self.value[key1][k][0] < value[0]:  # Offers werden betrachtet
                         self.value[key1][k][0] = value[0]  # wenn aktuell mehr ausgeglichen wird, dieser Wert besser
@@ -132,7 +144,7 @@ def get_input(pfad):
         ziffern.append(ZifferSystem(char, i))
         i += 1
     aktionen = int(zeilen[1])
-    print("Aktionen", aktionen)
+    print("Aktionen: ", aktionen)
     return ziffern, aktionen
 
 
@@ -377,15 +389,22 @@ def ausgleich_der_stäbchen_iter(index, actions_left, ziffern, offers, requests)
     return False, ausgleichs_werte.get_value(start_index, actions_left)
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
+for i in range(6):
+    outputstr = ""
+    print(f"\nAusgabe für hexmax{i}.txt:")
     ausgleichs_werte = CharInformationDict2D()
     versuchsliste = "FEDCBA9876543210"  # Hex-Zahlen zum durch iterieren
     tabelle = gen_tabelle()  # tabelle[goalchar][startchar]
     offers = 0  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
     requests = 0  # liste von ziffer_ids dessen ziffer striche Anfragen
 
-    pfad = input("Geben sie den Pfad zur Input-Datei an:\n->")
+    pfad = f"hexmax{i}.txt"  # input("Geben sie den Pfad zur Input-Datei an:\n->")
     ziffern, actions_left = get_input(pfad)  # input aus Text-Datei
 
     maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffern)  # haupt funktion
     ausgabe()
+    print("\n--ENDE--")
+    file = open(f"Ausgabe hexmax{i}.txt", "x")
+    file.write(outputstr)
+    file.close()
