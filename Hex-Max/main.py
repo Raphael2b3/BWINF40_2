@@ -1,13 +1,4 @@
-from builtins import print as _print
-
-
-def print(*argumente, end="\n"):
-    global outputstr
-    for arg in argumente:
-        outputstr += str(arg) + " "
-    outputstr += end
-    _print(*argumente, end=end)
-
+from safeOutput2fileImport import *
 
 class ZifferSystem:
     models = {
@@ -391,6 +382,7 @@ def ausgleich_der_stäbchen_iter(index, actions_left, ziffern, offers, requests)
 
 # if __name__ == '__main__':
 for i in range(6):
+    OUTPUT_SAFER_start_listening()
     outputstr = ""
     print(f"\nAusgabe für hexmax{i}.txt:")
     ausgleichs_werte = CharInformationDict2D()
@@ -405,6 +397,5 @@ for i in range(6):
     maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffern)  # haupt funktion
     ausgabe()
     print("\n--ENDE--")
-    file = open(f"Ausgabe hexmax{i}.txt", "x")
-    file.write(outputstr)
-    file.close()
+    OUTPUT_SAFER_safe_to_file(f"Ausgabe hexmax{i}.txt")
+
