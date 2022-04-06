@@ -1,7 +1,7 @@
 import time
 
 
-class time_analysing:
+class Time_analysing:
     start = 0
     delta = 0
     lastmessage = "Starting"
@@ -16,3 +16,10 @@ class time_analysing:
         print(message, "Currenttime:", fromstart, "since last check:", fromlastpoint)
         self.delta = currenttime
         self.lastmessage = message
+
+
+__time_analysing = Time_analysing()
+
+
+def get_time(message=""):
+    __time_analysing.set_time_point(message)

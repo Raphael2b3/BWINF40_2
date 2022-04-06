@@ -19,7 +19,7 @@ class safeOutputToFile:
 
     def print(self, *argumente, end="\n"):
         for arg in argumente:
-            self.outputstr += str(arg) + (" " if len(argumente) != 0 else "")
+            self.outputstr += str(arg) + (" " if len(argumente) != 0 and end == "\n" else "")
         self.outputstr += end
         _print(*argumente, end=end)
 

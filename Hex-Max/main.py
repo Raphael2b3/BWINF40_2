@@ -1,7 +1,265 @@
-from safeOutput2fileImport import *
+import sys  # um die Rekursionstiefe zu modifizieren
+
 
 class ZifferSystem:
-    models = {
+
+    def __init__(self, char):
+        self.positions = ziffern_models[char][:]  # kopiere die Instanz sodass keine Referenz mehr entsteht
+        self.notyet_empty_indeces = []
+        self.notyet_filled_indeces = []
+        self.char = char
+        self.ursprungschar = char
+
+    def set_ziel_char(self, ziel_char):
+        self.char = ziel_char  # setzt den char wert zum ziel
+        model = ziffern_models[ziel_char]
+        wegnehmen = 0
+        hinzulegen = 0
+        self.notyet_empty_indeces.clear()
+        self.notyet_filled_indeces.clear()
+        for i in range(7):
+            if not model[i] == self.positions[i]:
+                if model[i]:
+                    hinzulegen += 1
+                    self.notyet_filled_indeces.append(i)
+                else:
+                    wegnehmen += 1
+                    self.notyet_empty_indeces.append(i)  # sticks müssen von Pos weggenommen werden
+        return wegnehmen, hinzulegen
+
+
+class ZiffernChangeInformation:
+
+    def __init__(self, weg, hin, _notyet_empty_indeces, _notyet_filled_indeces):
+        self.min_aktion = min(weg, hin)
+        self.weg = weg
+        self.hin = hin
+        self.stick_mangel = hin - weg
+        self.notyet_empty_indeces = _notyet_empty_indeces
+        self.notyet_filled_indeces = _notyet_filled_indeces
+
+
+def get_input(_pfad):
+    text = open(_pfad, "r").read()
+    zeilen = text.split("\n")
+    print(zeilen[0])
+    _ziffern = [ZifferSystem(char) for char in zeilen[0]]  # Instanzierung der Ziffernsysteme
+    aktionen = int(zeilen[1])
+    print("Aktionen: ", aktionen)
+    return _ziffern, aktionen
+
+
+def print_ziffern():  # printet die momentane Anordnung der Sticks
+    zeile_1 = ""
+    zeile_2 = ""
+    zeile_3 = ""
+
+    for ziffer in ziffern:
+        zeile_1 += f" {'_' if ziffer.positions[0] else ' '}  "
+        zeile_2 += f"{'|' if ziffer.positions[3] else ' '}{'_' if ziffer.positions[1] else ' '}{'|' if ziffer.positions[4] else ' '} "
+        zeile_3 += f"{'|' if ziffer.positions[5] else ' '}{'_' if ziffer.positions[2] else ' '}{'|' if ziffer.positions[6] else ' '} "
+
+    print("____")
+    print(zeile_1)
+    print(zeile_2)
+    print(zeile_3)
+    print()
+
+
+def ausgabe():
+    print("Ergebnis:\nEnd-Hexadezimalzahl")
+    print("\nAusgangssituation:")
+    print_ziffern()
+    for z in ziffern:
+        z.set_ziel_char(z.char)
+    # Stick-Umlegung Ausgabe:
+    aktion_debug = 1
+    for z_from in ziffern:  # ...
+        for i in z_from.notyet_empty_indeces:  # ... alle noch nicht leeren positionen werden gesucht
+            found = False  # helper
+            for z_to in ziffern:
+                for j in z_to.notyet_filled_indeces:  # Ziffern werden auf noch nicht gefüllte Positionen durchsucht
+                    z_from.positions[i], z_to.positions[j] = False, True  # Umlegung des Sticks
+                    print_ziffern()  # ausgabe der Situation nach Umlegung des Sticks
+                    print("==== Das war Aktion", aktion_debug)
+                    aktion_debug += 1
+                    found = True
+                    break
+                if found:
+                    z_to.notyet_filled_indeces.pop(0)  # entfernt index aus der liste der noch nicht belegten Positionen
+                    break
+
+    print("Ergebnis:\nEnd-Hexadezimalzahl")
+    for ziffer in ziffern:
+        print(ziffer.char, end="")
+    print("\n--ENDE--")
+
+
+def simulate_change(start_char, ziel_char):
+    global offers, requests
+    bu_offers, bu_requests = offers, requests  # backup
+
+    change_inf = change_inf_tabelle[start_char][ziel_char]
+    aktionen = change_inf.min_aktion  # es müssen mindestens die unter einander zu tauschenden sticks
+    if change_inf.stick_mangel > 0:  # es wird aus offers genommen
+        offers -= change_inf.stick_mangel  # offers verringert sich
+        if offers < 0:  # es muss eine eigene request aufgegeben werden...
+            aktionen -= offers  # ...das ist eine extra aktion
+            requests -= offers
+            # dieser muss aus dem delta entfernt werden...
+            offers = 0  # ...da offers auf 0 gesetzt wird
+    elif change_inf.stick_mangel < 0:  # es wird aus requests genommen
+        requests += change_inf.stick_mangel  # so viele es requests werden befriedigt
+        if requests < 0:  # es muss ein angebot für alle sichtbar erstellt werden
+            aktionen -= requests  # das kostet
+            offers -= requests  # offers erhöht sich
+            requests = 0
+    return aktionen, bu_offers, bu_requests
+
+
+def maximiere_ziffern():
+    global actions_left, index, offers, requests
+    if index == len(ziffern) or actions_left == 0:  # wenn es keine Ziffern mehr zum Verändern gibt
+        return 0 == offers - requests  # win condition
+
+    aktuelle_ziffer = ziffern[index]  # betrachtete aktuelle Ziffer
+    for char in versuchsliste:
+        # Simuliert das Umwandeln dieser Ziffer und returned die Situation wie sie dann aussehen wird
+        aktionen, bu_offers, bu_requests = simulate_change(aktuelle_ziffer.ursprungschar, char)
+        # macht backup von dieser Situation
+        actions_left -= aktionen
+        if actions_left >= 0:  # wenn mehr Aktionen gebraucht als verfügbar, diese Ziffer unmöglich
+            zielausgleich = offers + requests  # offers oder requests ist 0
+            index += 1
+            ausgleichswert = best_ausgleich()
+            if ausgleichswert[0 if offers > 0 else 1] >= zielausgleich:  # wenn Zielausgleich nicht erreicht werden kann
+                aktuelle_ziffer.char = char
+
+                if maximiere_ziffern() or ausgleich_der_stäbchen():
+                    return True
+                aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
+            index -= 1
+
+        # Simulation rückgängig machen
+        actions_left += aktionen
+        offers, requests = bu_offers, bu_requests
+    return False
+
+
+def ausgleich_der_stäbchen():
+    global index, actions_left, offers, requests
+    zielausgleich = offers + requests
+    if index == len(ziffern):  # keine Ziffern mehr überprüfbar
+        return zielausgleich == 0  # win condition
+    # betrachtete aktuelle Ziffer
+    aktuelle_ziffer = ziffern[index]
+    for char in versuchsliste:
+        aktionen, bu_offers, bu_requests = simulate_change(aktuelle_ziffer.ursprungschar, char)
+        actions_left -= aktionen
+        if actions_left >= 0:  # dieser char funktioniert nicht, weil zu viele aktionen gebraucht werden
+            # von den nächsten Ziffern kennen
+            new_zielausgleich = offers + requests
+            index += 1
+            max_ausgleich = best_ausgleich()
+            if max_ausgleich[0 if offers > 0 else 1] >= new_zielausgleich:
+                aktuelle_ziffer.char = char
+                if ausgleich_der_stäbchen():
+                    return True
+                aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
+            index -= 1
+        actions_left += aktionen
+        offers, requests = bu_offers, bu_requests
+    return False
+
+
+def gen_tabelle():
+    # t[start][ziel]
+    tabelle = {}
+    for z in ziffern:
+        if z.ursprungschar in tabelle: continue
+        temp = {}
+        for char in versuchsliste:
+            wegnehmen, hinzulegen = z.set_ziel_char(char)
+            temp[char] = ZiffernChangeInformation(wegnehmen, hinzulegen, z.notyet_empty_indeces[:],
+                                                  z.notyet_filled_indeces[:])
+        tabelle[z.ursprungschar] = temp
+        z.char = z.ursprungschar
+    return tabelle
+
+
+def allgemeines_ausgleichs_potenzial():
+    global actions_left
+    aap_tabelle = {}
+    for ziffer in ziffern:
+        if ziffer.ursprungschar in aap_tabelle: continue
+        start_char = ziffer.ursprungschar
+        aap_tabelle[start_char] = {}
+        # iteriere durch alle möglichen Ziel chars
+        for zielchar in versuchsliste:
+
+            change_inf = change_inf_tabelle[start_char][zielchar]  # change Information
+            if actions_left < change_inf.min_aktion:  # wenn für diese Umwandlung nicht genügend Aktionen übrig sind
+                continue
+
+            new_value = [change_inf.hin - change_inf.min_aktion,
+                         change_inf.weg - change_inf.min_aktion]  # der Mindestwert
+
+            # [ausgleich von offers, ausgleich von requests]
+
+            for k in aap_tabelle[start_char]:  # schaut sich die Ausgleiche von aktionen an mit
+                if k <= change_inf.min_aktion:  # wenn schonmal mit max gleich vielen aktionen besser ausgeglichen wurde
+                    if aap_tabelle[start_char][k][0] > new_value[0]:
+                        new_value[0] = aap_tabelle[start_char][k][0]  # der neue Value übernimmt den besseren
+                    if aap_tabelle[start_char][k][1] > new_value[1]:
+                        new_value[1] = aap_tabelle[start_char][k][1]  # der neue Value übernimmt den besseren
+            useless = []
+            for k in aap_tabelle[start_char]:  # schaut sich die ausgleiche von anden
+                if k > change_inf.min_aktion:  # die situationen beidem mehr aktionen verfügbar waren
+                    if aap_tabelle[start_char][k][0] < new_value[0]:
+                        aap_tabelle[start_char][k][0] = new_value[0]
+                    if aap_tabelle[start_char][k][1] < new_value[1]:
+                        aap_tabelle[start_char][k][1] = new_value[1]
+                    if aap_tabelle[start_char][k] == new_value:  # wenn durch mehr aktionen nichts gewonnen wurde
+                        useless.append(k)  # können wir uns diesen Vermerk sparen
+            for r in useless: aap_tabelle[start_char].pop(r)
+            aap_tabelle[ziffer.ursprungschar][change_inf.min_aktion] = new_value
+    return aap_tabelle
+
+
+def gen_ausgleichstabelle():
+    tabelle = {}
+    base_ausgleichs_tabelle = allgemeines_ausgleichs_potenzial()
+
+    for i in range(len(ziffern) - 1, -1, -1):  # gehe alle ziffern Rückwerts durch
+        ziffer = ziffern[i]  # spalte für ziffer i
+        tabelle[i] = base_ausgleichs_tabelle[ziffer.ursprungschar].copy()
+
+        # Ein bezug der Ergebnisse der oberen Ergebnisse
+        if i + 1 not in tabelle: continue  # wenn es obere Ergebnisse gibt
+
+        temp_keys = list(tabelle[i])[:]
+        for obere_akt in tabelle[i + 1]:
+            for geg_akt in temp_keys:
+                new_akt = geg_akt + obere_akt
+                if new_akt > actions_left: continue
+                tabelle[i][new_akt] = [tabelle[i][geg_akt][0] + tabelle[i + 1][obere_akt][0],
+                                       tabelle[i][geg_akt][1] + tabelle[i + 1][obere_akt][1]]
+    return tabelle
+
+
+def best_ausgleich():
+    global index, actions_left
+    max_ausgleich = (0, 0)
+    if index < len(ziffern):
+        for i in range(actions_left, -1, -1):
+            if i not in ausgleichswert_tabelle[index]: continue
+            max_ausgleich = ausgleichswert_tabelle[index][i]
+            break
+    return max_ausgleich
+
+
+if __name__ == '__main__':
+    ziffern_models = {
         '0': [True, False, True, True, True, True, True],
         '1': [False, False, False, False, True, False, True],
         '2': [True, True, True, False, True, True, False],
@@ -19,383 +277,15 @@ class ZifferSystem:
         'E': [True, True, True, True, False, True, False],
         'F': [True, True, False, True, False, True, False]
     }
-
-    def __init__(self, char, _id):
-        self.id = _id
-        self.positions = ZifferSystem.models[char][:]  # kopiere die Instanz sodass keine Referenz mehr entsteht
-        self.bekommt_von = []
-        self.useless_indeces = []
-        self.char = char
-        self.ursprungschar = char
-        self.active = False
-        self.char_i = 0
-        self.log = None
-
-    def aktionen_zum_ziel(self, ziel_char):
-        self.char = ziel_char  # setzt den char wert zum ziel
-        model = ZifferSystem.models[ziel_char]
-        wegnehmen = 0
-        hinzulegen = 0
-        self.useless_indeces.clear()
-        for i in range(7):
-            if not model[i] == self.positions[i]:
-                if model[i]:
-                    hinzulegen += 1
-                else:
-                    wegnehmen += 1
-                    self.useless_indeces.append(i)  # sticks müssen von Pos weggenommen werden
-        return wegnehmen, hinzulegen
-
-    def aktionen_log_zum_ziel(self):
-        model = ZifferSystem.models[self.char]
-        wegnehmen = 0
-        hinzulegen = 0
-        leerepositionen = []
-
-        for i in range(7):
-            if not model[i] == self.positions[i]:
-                if model[i]:
-                    hinzulegen += 1
-                    leerepositionen.append(i)
-                else:
-                    wegnehmen += 1
-
-        t_logs = []
-        sources = [self.id for _ in range(wegnehmen)] + self.bekommt_von
-
-        for p in leerepositionen:
-            gebenden_ziffer_id = sources.pop(-1)
-            log = self.id, p, gebenden_ziffer_id, ziffern[gebenden_ziffer_id].useless_indeces.pop(-1)
-            t_logs.append(log)
-        return t_logs
-
-
-class CharInformationDict2D:
-
-    def __init__(self):
-        self.value = {}
-
-    def key_exists(self, key1, key2=None):
-        if not key1 in self.value:
-            return False
-        if key2 is not None and key2 not in self.value[key1]:
-            return False
-        return True
-
-    def get_value(self, key1, key2=None):
-        if not key1 in self.value:
-            raise
-        if key2 is None:
-            return self.value[key1]
-        if key2 not in self.value[key1]:
-            raise
-        return self.value[key1][key2]
-
-    def set_value_filtered(self, key1, key2, value):
-        if key1 not in self.value:
-            self.value[key1] = {key2: value}
-        else:
-            for k in self.value[
-                key1].keys():  # index=0: Wenn Situation überschüssige Sticks | index=1:  " " Stick mangel hat
-                if k > key2:  # die situationen beidem aktionen verfügbar waren
-                    if self.value[key1][k][0] < value[0]:  # Offers werden betrachtet
-                        self.value[key1][k][0] = value[0]  # wenn aktuell mehr ausgeglichen wird, dieser Wert besser
-                    if self.value[key1][k][1] < value[1]:  # requests werden betrachtet
-                        self.value[key1][k][1] = value[1]  # wenn aktuell mehr ausgeglichen wird, dieser Wert besser
-                else:  # wenn schonmal besser ausgeglichen wurde
-                    if self.value[key1][k][0] > value[0]:
-                        value[0] = self.value[key1][k][0]  # der neue Value übernimmt den besseren
-                    if self.value[key1][k][1] < value[1]:
-                        value[0] = self.value[key1][k][0]  # der neue Value übernimmt den besseren
-            self.value[key1][key2] = value  # set modified value
-
-
-class ZiffernChangeInformation:
-
-    def __init__(self, weg, hin, useless_i):
-        self.min_aktion = min(weg, hin)
-        self.weg = weg
-        self.hin = hin
-        self.stick_mangel = hin - weg
-        self.useless_indeces = useless_i
-
-    def __eq__(self, other):
-        return self.weg == other.weg and self.hin == other.hin and self.useless_indeces == other.useless_indeces
-
-
-def get_input(pfad):
-    text = open(pfad, "r").read()
-    zeilen = text.split("\n")
-    zeilen.pop(-1)
-    #
-    ziffern = []  # sammelt alle Ziffern
-    print(zeilen[0])
-    i = 0
-    for char in zeilen[0]:
-        ziffern.append(ZifferSystem(char, i))
-        i += 1
-    aktionen = int(zeilen[1])
-    print("Aktionen: ", aktionen)
-    return ziffern, aktionen
-
-
-def print_ziffern(list_ziffern):  # printet die momentane Anordnung der Sticks
-    zeile_1 = ""
-    zeile_2 = ""
-    zeile_3 = ""
-
-    for ziffer in list_ziffern:
-        zeile_1 += f" {'_' if ziffer.positions[0] else ' '}  "
-        zeile_2 += f"{'|' if ziffer.positions[3] else ' '}{'_' if ziffer.positions[1] else ' '}{'|' if ziffer.positions[4] else ' '} "
-        zeile_3 += f"{'|' if ziffer.positions[5] else ' '}{'_' if ziffer.positions[2] else ' '}{'|' if ziffer.positions[6] else ' '} "
-
-    print("____")
-    print(zeile_1)
-    print(zeile_2)
-    print(zeile_3)
-    print()
-
-
-def try_change_char(start_char, zielchar, offers, requests):
-    global tabelle
-    d_offers, d_requests = 0, 0  # veränderung/Delta
-    bu_offers, bu_requests = offers, requests
-    inf = tabelle[start_char][zielchar]
-    aktionen = inf.min_aktion  # es müssen mindetens die unter einander zu tauschenden sticks
-    if inf.stick_mangel > 0:  # es wird aus offers genommen
-        offers -= inf.stick_mangel  # offers verringert sich
-        d_offers = -inf.stick_mangel  # um wieviel offers zu genommen hat
-        if offers < 0:  # es muss eine eigene request aufgegeben werden...
-            aktionen -= offers  # ...das ist eine extra aktion
-            requests -= offers
-            # dieser muss aus dem delta entfernt werden...
-            offers = 0  # ...da offers auf 0 gesetzt wird
-    elif inf.stick_mangel < 0:  # es wird aus requests genommen
-        requests += inf.stick_mangel  # so viele es requests werden befriedigt
-        d_requests = inf.stick_mangel
-        if requests < 0:  # es muss ein angebot für alle sichtbar erstellt werden
-            aktionen -= requests  # das kostet
-            offers -= requests  # offers erhöht sich
-            requests = 0
-
-    return aktionen, offers, requests, d_offers, d_requests, bu_offers, bu_requests
-
-
-def undo_action(log, actions_left):
-    aktionen, d_offers, d_requests, bu_offers, bu_requests = log
-    actions_left += aktionen
-    return actions_left, bu_offers, bu_requests
-
-
-def aktionen_planen(aktuelle_ziffer, offers, requests, tabelle):
-    inf = tabelle[aktuelle_ziffer.ursprungschar][aktuelle_ziffer.char]
-
-    for _ in range(inf.hin if inf.weg >= inf.hin else inf.weg):
-        aktuelle_ziffer.bekommt_von.append(aktuelle_ziffer.id)
-
-    for _ in range(abs(inf.stick_mangel)):
-        if inf.stick_mangel > 0:  # es wird aus offers genommen
-            if len(offers) > 0:
-                o = offers.pop(-1)
-                aktuelle_ziffer.bekommt_von.append(o)
-            else:
-                requests.append(aktuelle_ziffer.id)
-        elif inf.stick_mangel < 0:  # es wird aus requests genommen
-            if len(requests) > 0:
-                o = requests.pop(-1)
-                ziffern[o].bekommt_von.append(aktuelle_ziffer.id)
-            else:
-                offers.append(aktuelle_ziffer.id)
-    aktuelle_ziffer.useless_indeces = inf.useless_indeces.copy()
-    return offers, requests
-
-
-def ausgabe():
-    offers_list = []
-    requests_list = []
-    for ziffer in ziffern:
-        aktionen_planen(ziffer, offers_list, requests_list, tabelle)
-    print("\nAusgangssituation:")
-    print_ziffern(ziffern)
-    a = 1
-    for az in ziffern:
-        logs = az.aktionen_log_zum_ziel()
-
-        for log in logs:
-            """
-            az_id: Id der stick-annehmenden Ziffer
-            az_sp: Stickposition im Ziffernsystem der stick-annehmenden Ziffer
-            gz_id: Id der stick-abgebenden Ziffer
-            gz_sp: Stickposition im Ziffernsystem der stick-abgebenden Ziffer
-            """
-            az_id, az_sp, gz_id, gz_sp = log
-            # tauscht sticks zwischen den beiden
-            ziffern[az_id].positions[az_sp], ziffern[gz_id].positions[gz_sp] = ziffern[gz_id].positions[gz_sp], \
-                                                                               ziffern[az_id].positions[az_sp]
-            print_ziffern(ziffern)
-            print("Das war Aktion", a)
-            a += 1
-    print("Ergebnis:\nEnd-Hexadezimalzahl")
-    for ziff in ziffern:
-        print(ziff.char, end="")
-
-
-def gen_tabelle():
-    t = {}
-    ziffern_ = []
-    for i in range(len(versuchsliste)):
-        ziffern_.append(ZifferSystem(versuchsliste[i], i))
-
-    for z in ziffern_:
-        temp = {}
-        for char in versuchsliste:
-            wegnehmen, hinzulegen = z.aktionen_zum_ziel(char)
-            temp[char] = ZiffernChangeInformation(wegnehmen, hinzulegen, z.useless_indeces.copy())
-        t[z.ursprungschar] = temp
-    return t
-
-
-def maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffern):
-    # man geht immer vom best case aus
-    _index = 0
-    while True:
-        if _index == len(ziffern):  # wenn es keine Ziffern mehr zum Verändern gibt
-            if 0 == offers - requests:  # win condition
-                print("Es passt halt 1 Line 316")
-                break
-            _index -= 1  # Miserfolg
-            continue
-
-        aktuelle_ziffer = ziffern[_index]  # betrachtete aktuelle Ziffer
-        if not aktuelle_ziffer.active:  # aktuelle ziffer wird betrachtet
-            if actions_left == 0:  # die ziffer kann sich nicht mehr verändern nach Schema 1
-                if 0 == offers - requests:  # win condition
-                    print("Es passt halt 2 Line 324")
-                    break
-                _index -= 1  # Misserfolg
-                continue
-
-            aktuelle_ziffer.active = True  # die ziffer hier kann überprüft werden
-            char = versuchsliste[aktuelle_ziffer.char_i]  # iteriert durch alle Hex-Zahlen durch
-            # Simuliert das Umwandeln dieser Ziffer und returned die Situation wie sie dann aussehen wird
-            aktionen, offers, requests, d_offers, d_requests, bu_offers, bu_requests = try_change_char(
-                aktuelle_ziffer.ursprungschar, char,
-                offers, requests)
-            # macht backup von dieser Situation
-            log = (aktionen, d_offers, d_requests, bu_offers, bu_requests)
-            aktuelle_ziffer.log = log
-            aktuelle_ziffer.char = char
-            actions_left -= aktionen  # durch diesen Versuch verändert sich auch die übrigen Aktionen
-            if actions_left < 0:  # wenn mehr Aktionen gebraucht als verfügbar, diese Ziffer unmöglich
-                continue  # durch ziffer.active = True: im nächsten durchgang wird Überprüfungsschema2 probiert
-            if ausgleichs_werte.key_exists(_index + 1, actions_left):
-                # falls schon berechnet wurde, was der maximale Ausgleichswert ist
-                zielausgleich = offers + requests  # offers oder requests ist 0
-                ausgleichswert = ausgleichs_werte.get_value(_index + 1, actions_left)
-                if ausgleichswert[
-                    0 if offers > 0 else 1] < zielausgleich:  # wenn der Zielausgleich nicht erreicht werden kann
-                    continue  # wir wissen, dass dieser Char nicht möglich ist
-            _index += 1  # nächste ziffer wird betrachtet
-        else:
-            # backup laden
-            aktionen, d_offers, d_requests, bu_offers, bu_requests = aktuelle_ziffer.log
-
-            if actions_left >= 0:  # nur wenn die Simulation eine potenzielle Situation erschaffen
-                # nun wird überprüft, ob ein Ausgleich noch möglich ist der übrigen stäbchen möglich ist
-                # man darf nicht mehr aktionen verbraucht haben als zugänglich
-                ausgleichbar, n_maximal_ausgeglichen = ausgleich_der_stäbchen_iter(_index + 1,
-                                                                                   actions_left, ziffern, offers,
-                                                                                   requests)
-                if ausgleichbar: break  # win condition
-                # setzt nur, wenn es noch nicht existiert und wirklich besser ist
-                # ausgleichs_werte.set_value_filtered(_index, actions_left + aktionen, n_maximal_ausgeglichen)
-            # Simulation rückgängig machen
-            actions_left, offers, requests = actions_left + aktionen, bu_offers, bu_requests
-            aktuelle_ziffer.active = False
-            aktuelle_ziffer.char_i += 1
-            aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
-            if aktuelle_ziffer.char_i == len(versuchsliste):
-                aktuelle_ziffer.char_i = 0
-                _index -= 1
-    return True
-
-
-def ausgleich_der_stäbchen_iter(index, actions_left, ziffern, offers, requests):
-    global ausgleichs_werte
-
-    start_index = index
-    while start_index <= index:
-        zielausgleich = offers + requests
-        if index == len(ziffern):  # keine Ziffern mehr überprüfbar
-            if zielausgleich == 0: return True, 0  # win condition
-            ausgleichs_werte.set_value_filtered(index, actions_left, [0, 0])
-            index -= 1
-            continue
-        # betrachtete aktuelle Ziffer
-        aktuelle_ziffer = ziffern[index]
-        if not aktuelle_ziffer.active:  # first touch
-            if zielausgleich == 0: return True, 0  # win condition
-
-            char = versuchsliste[aktuelle_ziffer.char_i]  # char durch iterieren
-            # simulation machen
-            aktionen, offers, requests, d_offers, d_requests, bu_offers, bu_requests = try_change_char(
-                aktuelle_ziffer.ursprungschar, char, offers, requests)
-            actions_left -= aktionen
-            aktuelle_ziffer.char = char
-            aktuelle_ziffer.active = True
-            # backup für situation
-            aktuelle_ziffer.log = (aktionen, d_offers, d_requests, bu_offers, bu_requests)
-
-            new_zielausgleich = offers + requests
-            if actions_left < 0:
-                continue  # dieser char funktioniert nicht, weil zu viele aktionen gebraucht werden
-
-            if ausgleichs_werte.key_exists(index + 1, actions_left):  # wenn wir den besten ausgleichswert
-                # von den nächsten Ziffern kennen
-                max_ausgleich = ausgleichs_werte.get_value(index + 1, actions_left)
-                if max_ausgleich[0 if offers > 0 else 1] < new_zielausgleich:
-                    continue  # wir können diesen Char ausschließen
-            index += 1  # die Nächste Ziffer wird betrachtet
-        else:  # second touch
-            # load the back up
-            aktionen, d_offers, d_requests, bu_offers, bu_requests = aktuelle_ziffer.log
-
-            # undo simulation
-            actions_left, offers, requests = actions_left + aktionen, bu_offers, bu_requests
-            aktuelle_ziffer.active = False
-            aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
-            aktuelle_ziffer.char_i += 1
-
-            if ausgleichs_werte.key_exists(index + 1,
-                                           actions_left):  # wenn wir den Ausgleichswert von der nächsten Ziffer kennen
-                upperwin = ausgleichs_werte.get_value(index + 1, actions_left)  # was ist dieser Wert?
-                actual_win = [(-d_offers) + upperwin[0], (-d_requests) + upperwin[1]]
-                # wie hoch wäre dieser Win auf unsere Situation
-                ausgleichs_werte.set_value_filtered(index, actions_left,
-                                                    actual_win)  # setzt es nur, wenn es auch wirklich besser ist
-
-            if aktuelle_ziffer.char_i == len(versuchsliste):  # every char was checked
-                aktuelle_ziffer.char_i = 0
-                index -= 1
-    return False, ausgleichs_werte.get_value(start_index, actions_left)
-
-
-# if __name__ == '__main__':
-for i in range(6):
-    OUTPUT_SAFER_start_listening()
-    outputstr = ""
-    print(f"\nAusgabe für hexmax{i}.txt:")
-    ausgleichs_werte = CharInformationDict2D()
     versuchsliste = "FEDCBA9876543210"  # Hex-Zahlen zum durch iterieren
-    tabelle = gen_tabelle()  # tabelle[goalchar][startchar]
-    offers = 0  # liste von ziffer_ids dessen ziffer striche zur verfügen stellen
-    requests = 0  # liste von ziffer_ids dessen ziffer striche Anfragen
+    offers = requests = index = 0
 
-    pfad = f"hexmax{i}.txt"  # input("Geben sie den Pfad zur Input-Datei an:\n->")
+    pfad = f"hexmax5.txt"  # input("Geben sie den Pfad zur Input-Datei an:\n->")
     ziffern, actions_left = get_input(pfad)  # input aus Text-Datei
 
-    maximiere_ziffern_iter(versuchsliste, actions_left, offers, requests, ziffern)  # haupt funktion
-    ausgabe()
-    print("\n--ENDE--")
-    OUTPUT_SAFER_safe_to_file(f"Ausgabe hexmax{i}.txt")
+    change_inf_tabelle = gen_tabelle()  # change_inf_tabelle[start][ziel]
+    ausgleichswert_tabelle = gen_ausgleichstabelle()
 
+    sys.setrecursionlimit(len(ziffern) * len(versuchsliste) + 1)  # maximum of recursions depth
+    maximiere_ziffern()  # haupt funktion
+    ausgabe()
