@@ -167,7 +167,7 @@ def ausgleich_der_stäbchen():
     return False
 
 
-def gen_tabelle():
+def gen_tabelle_c_inf():
     # t[start][ziel]
     tabelle = {}
     for z in ziffern:
@@ -267,7 +267,7 @@ def best_ausgleich():
     return max_ausgleich
 
 
-if __name__ == '__main__':
+if  __name__ == '__main__':
     ziffern_models = {
         '0': [True, False, True, True, True, True, True],
         '1': [False, False, False, False, True, False, True],
@@ -292,7 +292,7 @@ if __name__ == '__main__':
 
     ziffern, actions_left = get_input()  # input aus Text-Datei
 
-    change_inf_tabelle = gen_tabelle()  # change_inf_tabelle[start][ziel]
+    change_inf_tabelle = gen_tabelle_c_inf()  # change_inf_tabelle[start][ziel]
     ausgleichswert_tabelle = gen_ausgleichstabelle()
 
     sys.setrecursionlimit(len(ziffern) * len(versuchsliste) + 1)  # maximum of recursions depth
