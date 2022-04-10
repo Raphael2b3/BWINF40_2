@@ -134,7 +134,6 @@ def maximiere_ziffern():
                     return True
                 aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
             index -= 1
-
         # Simulation rückgängig machen
         actions_left += aktionen
         angebot, nachfrage = bu_offers, bu_requests
@@ -172,12 +171,11 @@ def gen_tabelle_c_inf():
     tabelle = {}
     for z in ziffern:
         if z.ursprungschar in tabelle: continue
-        temp = {}
+        tabelle[z.ursprungschar] = {}
         for char in versuchsliste:
             wegnehmen, hinzulegen = z.set_ziel_char(char)
-            temp[char] = ZiffernChangeInformation(wegnehmen, hinzulegen, z.notyet_empty_indeces[:],
-                                                  z.notyet_filled_indeces[:])
-        tabelle[z.ursprungschar] = temp
+            tabelle[z.ursprungschar][char] = ZiffernChangeInformation(wegnehmen, hinzulegen, z.notyet_empty_indeces[:],
+                                                                      z.notyet_filled_indeces[:])
         z.char = z.ursprungschar
     return tabelle
 
@@ -190,8 +188,8 @@ def allgemeines_ausgleichs_potenzial():
         start_char = ziffer.ursprungschar
         aap_tabelle[start_char] = {}
         # iteriere durch alle möglichen Ziel chars
-        for zielchar in versuchsliste:
 
+        for zielchar in versuchsliste:
             change_inf = change_inf_tabelle[start_char][zielchar]  # change Information
             if actions_left < change_inf.min_aktion:  # wenn für diese Umwandlung nicht genügend Aktionen übrig sind
                 continue
@@ -200,7 +198,6 @@ def allgemeines_ausgleichs_potenzial():
                          change_inf.weg - change_inf.min_aktion]  # der Mindestwert
 
             # [ausgleich von angebot, ausgleich von nachfrage]
-
             for k in aap_tabelle[start_char]:  # schaut sich die Ausgleiche von aktionen an mit
                 if k <= change_inf.min_aktion:  # wenn schonmal mit max gleich vielen aktionen besser ausgeglichen wurde
                     if aap_tabelle[start_char][k][0] > new_value[0]:
@@ -214,8 +211,8 @@ def allgemeines_ausgleichs_potenzial():
                     if aap_tabelle[start_char][k][1] < new_value[1]:
                         aap_tabelle[start_char][k][1] = new_value[1]
             aap_tabelle[ziffer.ursprungschar][change_inf.min_aktion] = new_value
-
-    return entferne_unnötige_zellen(aap_tabelle)
+    aap_tabelle = entferne_unnötige_zellen(aap_tabelle)
+    return aap_tabelle
 
 
 def entferne_unnötige_zellen(dictionary):
@@ -267,7 +264,7 @@ def best_ausgleich():
     return max_ausgleich
 
 
-if  __name__ == '__main__':
+if __name__ == '__main__':
     ziffern_models = {
         '0': [True, False, True, True, True, True, True],
         '1': [False, False, False, False, True, False, True],
@@ -298,4 +295,3 @@ if  __name__ == '__main__':
     sys.setrecursionlimit(len(ziffern) * len(versuchsliste) + 1)  # maximum of recursions depth
     maximiere_ziffern()  # haupt funktion
     ausgabe()
-
