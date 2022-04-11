@@ -36,7 +36,7 @@ class ZiffernChangeInformation:
 
 
 def get_input():
-    pfad = input("Geben sie den Pfad zur Input-Datei an:\n->")
+    pfad = "hexmax5.txt"  # input("Geben sie den Pfad zur Input-Datei an:\n->")
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     _ziffern = [ZifferSystem(char) for char in zeilen[0]]  # Instanziierung der Ziffernsysteme
@@ -100,7 +100,6 @@ def simulate_change(start_char, ziel_char):
         if angebot < 0:  # es muss eine eigene request aufgegeben werden...
             aktionen -= angebot  # ...das ist eine extra aktion
             nachfrage -= angebot
-            # dieser muss aus dem delta entfernt werden...
             angebot = 0  # ...da angebot auf 0 gesetzt wird
     elif change_inf.stick_mangel < 0:  # es wird aus nachfrage genommen
         nachfrage += change_inf.stick_mangel  # so viele es nachfrage werden befriedigt
@@ -113,8 +112,9 @@ def simulate_change(start_char, ziel_char):
 
 def maximiere_ziffern():
     global actions_left, index, angebot, nachfrage
-    if index == len(ziffern) or actions_left == 0:  # wenn es keine Ziffern mehr zum Verändern gibt
-        return 0 == angebot - nachfrage  # win condition
+    if 0 == angebot - nachfrage:
+        if index == len(ziffern):  # wenn es keine Ziffern mehr zum Verändern gibt
+            return True
 
     aktuelle_ziffer = ziffern[index]  # betrachtete aktuelle Ziffer
     for char in versuchsliste:
@@ -129,38 +129,11 @@ def maximiere_ziffern():
             if ausgleichswert[
                 0 if angebot > 0 else 1] >= zielausgleich:  # wenn Zielausgleich nicht erreicht werden kann
                 aktuelle_ziffer.char = char
-
-                if maximiere_ziffern() or ausgleich_der_stäbchen():
+                if maximiere_ziffern():
                     return True
                 aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
             index -= 1
         # Simulation rückgängig machen
-        actions_left += aktionen
-        angebot, nachfrage = bu_offers, bu_requests
-    return False
-
-
-def ausgleich_der_stäbchen():
-    global index, actions_left, angebot, nachfrage
-    zielausgleich = angebot + nachfrage
-    if index == len(ziffern):  # keine Ziffern mehr überprüfbar
-        return zielausgleich == 0  # win condition
-    # betrachtete aktuelle Ziffer
-    aktuelle_ziffer = ziffern[index]
-    for char in versuchsliste:
-        aktionen, bu_offers, bu_requests = simulate_change(aktuelle_ziffer.ursprungschar, char)
-        actions_left -= aktionen
-        if actions_left >= 0:  # dieser char funktioniert nicht, weil zu viele aktionen gebraucht werden
-            # von den nächsten Ziffern kennen
-            new_zielausgleich = angebot + nachfrage
-            index += 1
-            max_ausgleich = best_ausgleich()
-            if max_ausgleich[0 if angebot > 0 else 1] >= new_zielausgleich:
-                aktuelle_ziffer.char = char
-                if ausgleich_der_stäbchen():
-                    return True
-                aktuelle_ziffer.char = aktuelle_ziffer.ursprungschar
-            index -= 1
         actions_left += aktionen
         angebot, nachfrage = bu_offers, bu_requests
     return False
