@@ -11,7 +11,7 @@ class ZifferSystem:
         self.ursprungschar = char
 
     def set_ziel_char(self, ziel_char):
-        self.char = ziel_char  # setzt den char zum ziel
+        self.char = ziel_char  # setzt den char zum goal
         model = ziffern_models[ziel_char]
         self.notyet_empty_indeces.clear()
         self.notyet_filled_indeces.clear()
@@ -140,7 +140,7 @@ def maximiere_ziffern():
 
 
 def gen_tabelle_c_inf():
-    # t[start][ziel]
+    # t[start][goal]
     tabelle = {}
     for z in ziffern:
         if z.ursprungschar in tabelle: continue
@@ -262,7 +262,7 @@ if __name__ == '__main__':
 
     ziffern, actions_left = get_input()  # input aus Text-Datei
 
-    change_inf_tabelle = gen_tabelle_c_inf()  # change_inf_tabelle[start][ziel]
+    change_inf_tabelle = gen_tabelle_c_inf()  # change_inf_tabelle[start][goal]
     ausgleichswert_tabelle = gen_ausgleichstabelle()
 
     sys.setrecursionlimit(len(ziffern) * len(versuchsliste) + 1)  # maximum of recursions depth
