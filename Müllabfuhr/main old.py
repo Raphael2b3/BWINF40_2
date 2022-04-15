@@ -159,7 +159,7 @@ class Graph:
 
 
 def get_input():
-    pfad = "muellabfuhr8.txt"
+    pfad = "muellabfuhr6.txt"
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     zeilen.pop(-1)
