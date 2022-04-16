@@ -1,3 +1,5 @@
+from typing import List
+
 from performance_analysing import *
 import prozessbar
 
@@ -13,7 +15,21 @@ class Path:
         self.start: int = start
         self.streets = []
         self.weight = 0
-        self.crossing_ids: list[int] = [start]
+        self.crossing_ids: List[int] = [start]
+
+    def decide_next_path(self, _wayback=False):
+        position = self.get_pos_crs()
+        for street in position.streets:
+            if not street.important and street.usable > 0 and not _wayback:
+                return street
+        for street in position.streets:
+            if street.important and street.usable > 0 and _wayback:
+                return street
+
+    def get_pos_crs(self):
+        return crossings[self.crossing_ids[-1]]
+
+
 
     def append(self, street):
         self.streets.append(street)
@@ -57,7 +73,8 @@ class Street:
         self.start = start
         self.stop = stop
         self.weight = weight
-        self.used = False
+        self.usable = 1
+        self.important = False
 
     def __eq__(self, other):
         return self.id == other  # um geblockte streets zu erkennen
@@ -84,64 +101,20 @@ class Crossing:
         return self.id == other  # wenn geguckt wird, ob ein crossing schon bekannt ist
 
 
-class Car:
-
-    def __init__(self, position):
-        self.position = crossings[position]
-        self.path = Path(position)
-        self.checkpoints = []
-        self.decisions = {}
-        self.compromised = []
-        self.max_weight = 0
-
-    def decide_next_path(self):
-        while True:
-            depth = len(self.path.streets)
-            if depth not in self.decisions:
-                self.decisions[depth] = 0
-
-            if not self.is_compromising():
-                if self.decisions[depth] < len(self.position.streets):
-                    t = self.position.streets[self.decisions[depth]]
-                    if not self.goal_useable(t):
-                        self.decisions[depth] += 1
-                        continue
-                    self.path.append(t)
-                    self.position = crossings[self.path.crossing_ids[-1]]
-                    if self.max_weight < self.path.weight:
-                        self.max_weight = self.path.weight
-                    return
-                self.compromised.append(depth)
-                self.decisions[depth] = 0
-            else:
-                if self.decisions[depth] < len(self.position.streets):
-                    if self.path.weight > self.max_weight:
-                        self.decisions[depth] += 1
-                        continue
-                    t = self.position.streets[self.decisions[depth]]
-                    self.path.append(t)
-                    self.position = crossings[self.path.crossing_ids[-1]]
-                    self.decisions[depth] += 1
-                    return
-
-    def goal_useable(self, strt: Street):
-        future_pos = crossings[strt.other_crossing(self.position.id)]
-        return not (strt.used or future_pos.used)
-
-
-    def is_compromising(self):
-        depth = len(self.path.streets)
-        return depth in self.compromised
-
-    def step_back(self):
-        self.path.remove(self.path.streets[-1])
-        depth = len(self.path.streets)
+def mark_important_streets():
+    for c in crossings:
+        blocked = c.streets[:]
+        for s in c.streets:
+            blocked.remove(s)
+            path = get_shortest_paths(0, blocked)
+            s.important = path[c.id].weight != float("inf")
+            blocked.append(s)
 
 
 def find_way_back():
     path_tree = shortest_paths[0]
     for car in cars:
-        way_back = path_tree[car.position.id].copy()
+        way_back = path_tree[car.get_pos_crs().id].copy()
         way_back.reverse()
         car.path.add(way_back)
 
@@ -184,6 +157,69 @@ def get_next_car():  # gets smallest car
     return car
 
 
+def dijkstra_algorithm(_start_id, blocked_streets=None):
+    if blocked_streets is None: blocked_streets = []
+    paths = [INF_PATH for _ in range(n_crossings)]
+    paths[_start_id] = Path(_start_id)
+    finished = [False for _ in range(n_crossings)]
+
+    cur_crossing_id = _start_id
+    while False in finished:
+        cur_crossing = crossings[cur_crossing_id]
+
+        finished[cur_crossing_id] = True
+        path: Path = paths[cur_crossing_id]
+
+        for street in cur_crossing.streets:
+            if street in blocked_streets: continue
+            goal_id = street.other_crossing(cur_crossing_id)
+            if finished[goal_id]: continue
+            if path.weight + street.weight >= paths[goal_id].weight: continue
+
+            goal_path = path.copy()
+            goal_path.append(street)
+            paths[goal_id] = goal_path
+
+        for i in range(n_crossings):
+            if finished[i]: continue  # nicht wenn crossings fertig
+            if finished[cur_crossing_id]:  # wenn betrachteter Fertig wechseln!
+                cur_crossing_id = i
+                continue
+            if paths[cur_crossing_id].weight <= paths[i].weight: continue
+            # bleibt bei dem i welches die kleinste distanz hat
+            cur_crossing_id = i
+        if paths[cur_crossing_id].weight == float("inf"):
+            break  # abbruch weil nicht erreichbar
+    return paths
+
+
+def bench_crossings():
+    bad_crossings = []
+    for c in crossings:
+        if len(c.streets) % 2 != 0:
+            bad_crossings.append(c)
+    while len(bad_crossings) > 0:
+        bc = bad_crossings[0]
+        sp = get_shortest_paths(bc.id)
+        path_to_double = sp[bad_crossings[1].id]
+        for i in range(2, len(bad_crossings)):
+            new_path2dbl = sp[bad_crossings[i].id]
+            if path_to_double.weight > new_path2dbl.weight:
+                path_to_double = new_path2dbl
+        for street in path_to_double.streets:
+            street.usable += 1
+        bad_crossings.remove(bc)
+        bad_crossings.remove(path_to_double.get_pos_crs())
+
+
+def get_shortest_paths(start, blocked=None):
+    if blocked is not None:
+        return dijkstra_algorithm(start, blocked)
+    if not start in shortest_paths:
+        shortest_paths[start] = dijkstra_algorithm(start)
+    return shortest_paths[start]
+
+
 get_time("Start")
 
 if __name__ == '__main__':
@@ -194,22 +230,27 @@ if __name__ == '__main__':
     remove_list = []
     shortest_paths = {}
     crossings, streets = get_input()
-    cars = [Car(start_position) for i in range(days)]  # erstelle 5 car Klassen
+    cars = [Path(start_position) for i in range(days)]  # erstelle 5 car Klassen
     INF_PATH = Path("inf")
 
     n_crossings = len(crossings)
-
+    bench_crossings()
+    mark_important_streets()
     prozessbar.goal = n_streets = len(streets)
     while n_cleared_streets < n_streets:  # Programm läuft bis alle streets genutzt wurden
         prozessbar.show_state(n_cleared_streets)
 
         car = get_next_car()
-        car.decide_next_path()
-        for s in car.path.streets:
-            p1, p2 = crossings[s.start], crossings[s.stop]
-            if not s.used:
-                n_cleared_streets += 1
-            s.used = p2.used = p1.used = True
+        street = car.decide_next_path()
+        street.usable -= 1
+        if street.usable == 0:
+            n_cleared_streets += 1
+
+        street = car.decide_next_path()
+        street.usable -= 1
+        car.path.append(street)
+        if street.usable == 0:
+            n_cleared_streets += 1
 
     for auto in cars:
         for i in auto.streets:
