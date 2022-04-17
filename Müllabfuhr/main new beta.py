@@ -117,7 +117,7 @@ def print_solution():
 
 
 def get_input():
-    path = "muellabfuhr8.txt"
+    path = "eigBsp0.txt"
     text = open(path, "r").read()
     lines = text.split("\n")
     lines.pop(-1)
@@ -212,7 +212,7 @@ def sum_streets():
 
 if __name__ == '__main__':
     # Consts
-    days = 5  # von montag bis freitag sind 5 tage
+    days = 1  # von montag bis freitag sind 5 tage
     start_position = 0
     n_cleared_streets = 0
     remove_list = []
