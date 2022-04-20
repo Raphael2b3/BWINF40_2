@@ -36,7 +36,7 @@ class ZiffernChangeInformation:
 
 
 def get_input():
-    pfad = "hexmax5.txt"  # input("Geben sie den Pfad zur Input-Datei an:\n->")
+    pfad = input("Geben sie den Pfad zur Input-Datei an:\n->")
     text = open(pfad, "r").read()
     zeilen = text.split("\n")
     _ziffern = [ZifferSystem(char) for char in zeilen[0]]  # Instanziierung der Ziffernsysteme
@@ -112,8 +112,8 @@ def simulate_change(start_char, ziel_char):
 
 def maximiere_ziffern():
     global actions_left, index, angebot, nachfrage
-    if 0 == angebot - nachfrage:
-        if index == len(ziffern):  # wenn es keine Ziffern mehr zum Verändern gibt
+    if index == len(ziffern):  # wenn es keine Ziffern mehr zum Verändern gibt
+        if 0 == angebot - nachfrage:
             return True
 
     aktuelle_ziffer = ziffern[index]  # betrachtete aktuelle Ziffer
@@ -228,7 +228,7 @@ def gen_ausgleichstabelle():
 
 def best_ausgleich():
     global index, actions_left
-    max_ausgleich = (0, 0)
+    max_ausgleich = [0, 0]  # => [Ausgl. Angebot, Ausgl. Nachfrage]
     if index < len(ziffern):
         for i in range(actions_left, -1, -1):
             if i not in ausgleichswert_tabelle[index]: continue

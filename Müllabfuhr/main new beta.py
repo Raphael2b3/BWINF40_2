@@ -17,12 +17,97 @@ class Path:
         self.crossings: List[Crossing] = [crossings[start]]
         self.position = self.crossings[-1]
 
-    def decide_next_path(self, _wayback=False):
-        mark_important_streets(self.position)
-        for street in self.position.streets:
-            if street.important == _wayback:
+        """
+         def decide_next_path(self, goal, _wayback=False):
+        global n_cleared_streets
+        if self.position.n_unbanned_streets() == 0:
+            path = get_shortest_paths(self.position.id)
+            tmo = path[0]
+            for p in path:
+                if p.position == self.position: continue
+                if tmo != path[self.position.id] and tmo.weight <= p.weight: continue
+                if p.position.n_unbanned_streets() == 0: continue
+                tmo = p
+            for street in tmo.streets:
+                street.usable -= 1
+                car.append(street)
+                if not street.used:
+                    street.used = True
+                    n_cleared_streets += 1
+            return self.decide_next_path(goal)
+        for street in self.position.streets:  # check paths not leading back start point first
+            if street.banned: continue
+            goalc = street.other_crossing(self.position.id)
+            if goalc.id == start_position and self.weight + street.weight >= goal:
                 return street
-        return self.position.streets[0]
+
+        for street in self.position.streets:  # check for Sackgassen
+            if street.used: continue
+            goalc = street.other_crossing(self.position.id)
+            if goalc.n_unbanned_streets() == 1 and not goalc.id == start_position:
+                return street
+
+        for street in self.position.streets:  # check paths not leading back start point first
+            if street.used: continue
+            goalc = street.other_crossing(self.position.id)
+            if not goalc.id == start_position:
+                return street
+
+        for street in self.position.streets:  # check paths not leading back start point first
+            if street.usable == 0: continue
+            return street
+
+        """
+
+    def bla(self, start):
+        global goal
+        wayback = get_shortest_paths(0)[self.position.id]
+        if wayback.weight + car.weight >= goal:
+            car.do_optimal_wayback()
+            return True  # abbruch
+
+        path = get_shortest_paths(self.position.id, self.streets)
+        b = None
+        for a in path:
+            if a.position == self.position: continue
+            if b is None or b.weight < a.weight:
+                b = a
+        try_q = b.streets[:]
+        curp = self.position
+        for street in try_q:
+            gc = street.other_crossing(curp.id)
+            for s in gc.streets:
+                if s.usable > 1:
+                    pass
+    def decide_next_path(self, goal, _wayback=False):
+        global n_cleared_streets
+        best_street = None
+        for street in self.position.streets:
+            if street.weight + self.weight >= goal:
+                if best_street is None:
+                    best_street = street
+                else:
+                    if best_street.weight > street.weight:
+                        best_street = street
+        if best_street is None:
+            best_street = self.position.streets[0]
+            for street in self.position.streets:
+                if street.usable > best_street.usable:
+                    best_street = street
+        self.position.streets.remove(best_street)
+        self.position.streets.append(best_street)
+        return best_street
+
+    def do_optimal_wayback(self):
+        used_streets = self.streets[:]
+        path = get_shortest_paths(self.position.id, used_streets)
+        path2 = get_shortest_paths(0)
+        if path[0].weight == path2[self.position.id].weight:
+            self.add(path[0].copy())
+        else:
+            path2 = path2[self.position.id].copy()
+            path2.reverse()
+            self.add(path2)
 
     def append(self, street):
         self.streets.append(street)
@@ -40,7 +125,7 @@ class Path:
         t = Path(self.start)
         t.streets = self.streets[:]
         t.weight = self.weight
-        t.crossing_ids = self.crossings[:]
+        t.crossings = self.crossings[:]
         t.position = self.position
         return t
 
@@ -68,7 +153,8 @@ class Street:
         self.stop = stop
         self.weight = weight
         self.usable = 1
-        self.important = False
+        self.used = False
+        self.banned = False
 
     def __eq__(self, other):
         return self.id == other  # um geblockte streets zu erkennen
@@ -80,28 +166,25 @@ class Street:
         return self.weight < other
 
     def other_crossing(self, crossing_id):
-        return self.start if crossing_id == self.stop else self.stop
+        return crossings[self.start] if crossing_id == self.stop else crossings[self.stop]
 
 
 class Crossing:
 
     def __init__(self, _id, _streets):
         self.streets = _streets
-        self.streets.sort()
+        self.streets.sort(reverse=True)
         self.id = _id
         self.used = False
 
+    def n_unbanned_streets(self):
+        i = 0
+        for s in self.streets:
+            if not s.banned: i += 1
+        return i
+
     def __eq__(self, other):
         return self.id == other  # wenn geguckt wird, ob ein crossing schon bekannt ist
-
-
-def mark_important_streets(c: Crossing):
-    blocked = c.streets[:]
-    for _street in c.streets:
-        blocked.remove(_street)
-        path = get_shortest_paths(0, blocked)
-        _street.important = path[c.id].weight != float("inf")
-        blocked.append(_street)
 
 
 def print_solution():
@@ -114,7 +197,7 @@ def print_solution():
 
 
 def get_input():
-    path = "eigBsp0.txt"
+    path = "muellabfuhr1.txt"
     text = open(path, "r").read()
     lines = text.split("\n")
     lines.pop(-1)
@@ -147,14 +230,16 @@ def dijkstra_algorithm(_start_id, blocked_streets=None):
         path: Path = paths[cur_crossing_id]
 
         for street in cur_crossing.streets:
-            if street in blocked_streets: continue
-            goal_id = street.other_crossing(cur_crossing_id)
-            if finished[goal_id]: continue
-            if path.weight + street.weight >= paths[goal_id].weight: continue
+            if street in blocked_streets: continue  # TODO Find the best path back
+            goal = street.other_crossing(cur_crossing_id)
+            if finished[goal.id]: continue
+            if path.weight + street.weight >= paths[goal.id].weight: continue
 
             goal_path = path.copy()
+
             goal_path.append(street)
-            paths[goal_id] = goal_path
+
+            paths[goal.id] = goal_path
 
         for i in range(n_crossings):
             if finished[i]: continue  # nicht wenn crossings fertig
@@ -169,23 +254,57 @@ def dijkstra_algorithm(_start_id, blocked_streets=None):
     return paths
 
 
-def bench_crossings():
+def bench_crossings(useless_streets):
+    global dn
     bad_crossings = []
     for c in crossings:
-        if len(c.streets) % 2 != 0:
+        i = 0
+        for s in c.streets:
+            if s.used:
+                i += 1
+        if i == len(c.streets):
+            for s in c.streets:
+                s.banned = True
+                s.usable = 0
+                useless_streets.append(s)
+    for c in crossings:
+        i = 0
+        for s in c.streets:
+            if not s.banned:
+                i += 1
+        if i % 2 != 0:
             bad_crossings.append(c)
+    paths = get_shortest_paths(0)
+
+    def find_loneley_bc():
+        the_one = paths[bad_crossings[0].id]
+        for c in bad_crossings:
+            np = paths[c.id]
+            if the_one.weight >= np.weight: continue
+            the_one = np
+        return the_one.position
+
+    for s in streets:
+        if s.banned: continue
+        s.usable = 1
     while len(bad_crossings) > 0:
-        bc = bad_crossings[0]
-        sp = get_shortest_paths(bc)
-        path_to_double = sp[bad_crossings[1].id]
-        for i in range(2, len(bad_crossings)):
+        bc = find_loneley_bc()
+        sp = get_shortest_paths(bc.id)
+        path_to_double = None
+        for i in range(len(bad_crossings)):
+            if bc == bad_crossings[i]: continue
             new_path2dbl = sp[bad_crossings[i].id]
-            if path_to_double.weight > new_path2dbl.weight:
+            if path_to_double is None or path_to_double.weight > new_path2dbl.weight:
                 path_to_double = new_path2dbl
         for street in path_to_double.streets:
             street.usable += 1
+        """#if dn == 934:
+        print(dn)
+        dn += 1"""
         bad_crossings.remove(bc)
         bad_crossings.remove(path_to_double.position)
+
+    return useless_streets
 
 
 def get_shortest_paths(start, blocked=None):
@@ -207,49 +326,6 @@ def sum_streets(_streets, blocked):
     return out
 
 
-def blub():
-    _streets = streets[:]
-    used = []
-    blocked_list=[]
-    for i in range(days, 0, -1):
-
-        total = sum_streets(_streets, used)
-
-        blocked = []
-        gainable_goal = total/i
-        bla(_streets, blocked, gainable_goal, total, used)
-        for s in _streets:
-            if s not in blocked:
-                used.append(s)
-        blocked_list.append(blocked)
-
-
-def sort_streets(sl):
-    swap = True
-    while swap:
-        swap = False
-        for i in range(len(sl)-1):
-            s1 = sl[i]
-            s2 = sl[i+1]
-            # TODO SORT IT: Standard = (1. Sackgassen, 2. any):
-            #  1. use from older(standard)
-            #  2. not yet uses (standards)
-
-
-def bla(_streets, blocked, goal, curval, used, start=0): # curval = total weight of graph - wheight of streets removed from graph
-        if goal >= curval: # TODO FINd the right abbruchbedingung Siehe handy notizen
-            return True
-        for i in range(start,len(_streets)):
-            s = _streets[i]
-            blocked.append(s)
-            if find_a_cicle(blocked):
-                a = s.weight if s not in used else 0
-                if bla(_streets, blocked, goal, curval - a, used, i+1):
-                    return True
-            blocked.remove(s)
-        return False
-
-
 def find_a_cicle(blocked):
     for s in crossings[0].streets:
         if s in blocked: continue
@@ -263,7 +339,7 @@ def find_a_cicle(blocked):
 
 if __name__ == '__main__':
     # Consts
-    days = 1  # von montag bis freitag sind 5 tage
+    days = 5  # von montag bis freitag sind 5 tage
     start_position = 0
     n_cleared_streets = 0
     remove_list = []
@@ -273,21 +349,48 @@ if __name__ == '__main__':
     INF_PATH = Path("inf")
 
     n_crossings = len(crossings)
-    bench_crossings()
     cars_left = days
     prozessbar.goal = n_streets = len(streets)
+    blocked_streets = []
+    dn = 0
     for car in cars:  # Programm läuft bis alle streets genutzt wurden
-        goal = sum_streets(streets)/cars_left
+        blocked_streets = bench_crossings(blocked_streets)
+
+        goal = sum_streets(streets, blocked_streets) / cars_left
         cars_left -= 1
+        try_q = []
+        done = []
+        prozessbar.show_state(n_cleared_streets)
+        path = get_shortest_paths(0)
+        b = None
+        for a in path:
+            if a.weight == float("inf") or a.position == car.position or a.position.n_unbanned_streets() == 0: continue
+
+            mw = None
+            for s in a.position.streets:
+                if mw is None or s.weight < mw.weight:
+                    mw = s
+            a = a.copy()
+            a.append(mw)
+            if b is None or b.weight < a.weight:
+                b = a
+        for s in b.streets:
+            s.usable -= 1
+            s.used = True
+
+        car.add(b)
+
         while car.weight < goal:
-            prozessbar.show_state(n_cleared_streets)
-            street = car.decide_next_path()
+            try_q = b.streets[:]
+            street = car.decide_next_path(goal)
             street.usable -= 1
             car.append(street)
-            if street.usable == 0:
-                crossings[street.start].streets.remove(street)
-                crossings[street.stop].streets.remove(street)
+            if not street.used:
+                street.used = True
                 n_cleared_streets += 1
+        car.do_optimal_wayback()
+        for street in car.streets:
+            street.used = True
 
     for auto in cars:
         for i in auto.streets:
