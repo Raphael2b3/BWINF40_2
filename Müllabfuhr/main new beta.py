@@ -182,15 +182,20 @@ def find_cheapest_euler_combination(elements, combinations, best_result=(float("
 
 
 def eulerize_graph():
+    bad_crossings = []
+    for c in crossings:  # find bad crossings
+        if len(c.streets) % 2 != 0:
+            bad_crossings.append(c)
+    _, euler_combinations = find_cheapest_euler_combination(bad_crossings, [])
     streets_usable = {}
     for s in streets:
-        streets_usable[s.id] = 1
+        streets_usable[s.id] = days
     for pare in euler_combinations:
         a, b = pare
         paths = get_shortest_paths(a.id)
         p = paths[b.id]
         for street in p.streets:
-            streets_usable[street.id] += 1
+            streets_usable[street.id] += days
     return streets_usable
 
 
@@ -208,16 +213,13 @@ get_time("Start")
 class Car(Path):
     def __init__(self, start):
         super(Car, self).__init__(start)
-        self.blocked = []
-        self.count = {}
-        self.street_usable = eulerize_graph()
 
     def move(self, path):
         global n_cleared_streets
         for s in path.streets:
-            self.street_usable[s.id] -= 1
-            if self.street_usable[s.id] == 0:
-                self.blocked.append(s)
+            street_usability[s.id] -= 1
+            if street_usability[s.id] == 0:
+                blocked_streets.append(s)
             if not s.used:
                 s.used = True
                 usable_streets.remove(s)
@@ -228,16 +230,15 @@ class Car(Path):
         start = path.position.id
 
         future_blocked = []
-        tmp_usable_inf = self.street_usable.copy()
+        tmp_usable_inf = street_usability.copy()
 
         for s in path.streets:
-            if s not in blocked_streets: continue
             tmp_usable_inf[s.id] -= 1
             if tmp_usable_inf[s.id] == 0:
                 future_blocked.append(s)
-        connection_paths = get_shortest_paths(start, self.blocked + future_blocked)
+        connection_paths = get_shortest_paths(start, blocked_streets + future_blocked)
         for s in usable_streets:
-            if not s.used and s not in self.blocked and connection_paths[s.start].weight == float("inf"):
+            if s not in future_blocked and connection_paths[s.start].weight == float("inf"):
                 return False
         return True
 
@@ -282,7 +283,7 @@ def reduce_graph():
             stop.streets.remove(av_st[1])
             stop.streets.append(new_street)
 
-            ignored_crossings.append(cross)
+            #ignored_crossings.append(cross)
         elif len(av_st) == 1:  # Sackgasse
             length = av_st[0].weight * 2
             stop = start = av_st[0].other_crossing(cross.id)
@@ -293,7 +294,7 @@ def reduce_graph():
             streets.append(new_street)
             start.streets.remove(av_st[0])
             start.streets.append(new_street)
-            ignored_crossings.append(cross)
+            #ignored_crossings.append(cross)
 
 
 def inner_streets(_street):
@@ -310,9 +311,6 @@ if __name__ == '__main__':
     cars_left = days = 5  # von montag bis freitag sind 5 tage
     start_position = 0
     n_cleared_streets = 0
-    remove_list = []
-    blocked_streets = []
-    ignored_crossings = []
     shortest_paths = {}
     supportive_streets = {}
     crossings, streets = get_input()
@@ -320,29 +318,21 @@ if __name__ == '__main__':
     n_crossings = len(crossings)
     n_streets = len(streets)
     reduce_graph()
-    bad_crossings = []
-    for c in crossings:
-        if len(c.streets) % 2 != 0:
-            bad_crossings.append(c)
-    _, euler_combinations = find_cheapest_euler_combination(bad_crossings, [])
-
+    blocked_streets = []
+    street_usability = eulerize_graph()
     cars = [Car(start_position) for i in range(days)]  # erstelle 5 car Klassen
 
     prozessbar.goal = n_streets = len(streets)
-    car = None
+    car, path = None, None
     usable_streets = streets[:]
     while n_cleared_streets < n_streets:
         prozessbar.show_state(n_cleared_streets)
-        remove_list.clear()
-        car, path = None, None
         for street in usable_streets:  # longer ones at first
-            if street.used:
-                input()
-                continue
             car, path = best_car(street)
             if car is None: continue
             break
         car.move(path)
+
     waybacks = get_shortest_paths(0)
     for auto in cars:
         wb = waybacks[auto.position.id].copy()
