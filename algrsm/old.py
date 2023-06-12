@@ -396,7 +396,7 @@ def getPartialGraph(path):
     for auto in cars:
         t = []
         for edge in auto.streets:
-            t.append([str(edge.start), str(edge.stop), edge.weight])
+            t.append([edge.start, edge.stop, edge.weight])
         graphs.append(t)
     return graphs
 
